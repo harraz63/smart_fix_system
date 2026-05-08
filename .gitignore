@@ -27,8 +27,6 @@ build/
 jspm_packages/
 
 # Environment variables
-.env
-.env.*
 !.env.example
 
 # OS files
@@ -67,3 +65,4 @@ temp/
 # Misc
 *.tgz
 *.bak
+config.bat
