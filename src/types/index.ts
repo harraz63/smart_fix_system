@@ -32,11 +32,11 @@ export enum BookingStatus {
   // Legacy: pre-architecture-change bookings. New bookings never
   // start in this status. Kept in the enum for historical data
   // compatibility only — do not use in new code.
-  Pending = 'pending',
+  Pending   = 'pending',
 
-  Accepted = 'accepted',
-  Rejected = 'rejected',
-  Started = 'started',
+  Accepted  = 'accepted',
+  Rejected  = 'rejected',
+  Started   = 'started',
   Completed = 'completed',
   Cancelled = 'cancelled',
 }

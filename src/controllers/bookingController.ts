@@ -68,17 +68,10 @@ const transitionBooking = async (
   allowedRole: UserRole,
 ) => {
   const booking = await Booking.findById(req.params.id)
-    .populate<{
-      customerId: { _id: Types.ObjectId; name: string };
-    }>('customerId', 'name')
-    .populate<{
-      technicianId: { _id: Types.ObjectId; name: string } | null;
-    }>('technicianId', 'name');
+    .populate<{ customerId: { _id: Types.ObjectId; name: string } }>('customerId', 'name')
+    .populate<{ technicianId: { _id: Types.ObjectId; name: string } | null }>('technicianId', 'name');
 
-  if (!booking) {
-    errorResponse(res, 'Booking not found', 'NOT_FOUND', 404);
-    return null;
-  }
+  if (!booking) { errorResponse(res, 'Booking not found', 'NOT_FOUND', 404); return null; }
 
   const userId = auth(req).user._id.toString();
   if (
@@ -96,12 +89,7 @@ const transitionBooking = async (
   if (allowedRole === UserRole.Technician) {
     const techId = booking.technicianId?._id.toString();
     if (!techId || techId !== userId) {
-      errorResponse(
-        res,
-        'Only the assigned technician can perform this action',
-        'FORBIDDEN',
-        403,
-      );
+      errorResponse(res, 'Only the assigned technician can perform this action', 'FORBIDDEN', 403);
       return null;
     }
   }
@@ -128,7 +116,7 @@ const transitionBooking = async (
   socketService.emitBookingStatus(
     booking.customerId._id.toString(),
     booking.technicianId?._id.toString() ?? '',
-    booking,
+    booking
   );
 
   return booking;
@@ -147,24 +135,14 @@ const transitionBooking = async (
  * already has any non-terminal booking, this call fails. They
  * must cancel or finish that one first.
  */
-export const createBooking = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
+export const createBooking = async (req: Request, res: Response): Promise<void> => {
   const { serviceId, scheduledAt, addressId, notes } = req.body as {
-    serviceId?: string;
-    scheduledAt?: string;
-    addressId?: string;
-    notes?: string;
+    serviceId?: string; scheduledAt?: string;
+    addressId?: string; notes?: string;
   };
 
   if (!serviceId || !scheduledAt) {
-    errorResponse(
-      res,
-      'serviceId and scheduledAt required',
-      'MISSING_FIELDS',
-      400,
-    );
+    errorResponse(res, 'serviceId and scheduledAt required', 'MISSING_FIELDS', 400);
     return;
   }
 
@@ -181,16 +159,13 @@ export const createBooking = async (
       'You already have an active booking. Cancel or finish it first.',
       'ACTIVE_BOOKING_EXISTS',
       409,
-      { activeBookingId: existing._id.toString() },
+      { activeBookingId: existing._id.toString() }
     );
     return;
   }
 
   const service = await Service.findById(serviceId);
-  if (!service) {
-    errorResponse(res, 'Service not found', 'NOT_FOUND', 404);
-    return;
-  }
+  if (!service) { errorResponse(res, 'Service not found', 'NOT_FOUND', 404); return; }
 
   let addressSnapshot: { label?: string; lat?: number; lng?: number } = {};
   if (addressId) {
@@ -220,12 +195,7 @@ export const createBooking = async (
   ]);
 
   // No technician notification yet — that happens in assignTechnician.
-  successResponse(
-    res,
-    booking,
-    'Booking created — pick a technician next',
-    201,
-  );
+  successResponse(res, booking, 'Booking created — pick a technician next', 201);
 };
 
 /**
@@ -236,10 +206,7 @@ export const createBooking = async (
  * chosen technician; sends FCM push; schedules the 2-min auto-reject
  * timer (assignmentTimeout.ts).
  */
-export const assignTechnician = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
+export const assignTechnician = async (req: Request, res: Response): Promise<void> => {
   const { technicianId } = req.body as { technicianId?: string };
   if (!technicianId) {
     errorResponse(res, 'technicianId required', 'MISSING_FIELD', 400);
@@ -247,18 +214,10 @@ export const assignTechnician = async (
   }
 
   const booking = await Booking.findById(req.params.id);
-  if (!booking) {
-    errorResponse(res, 'Booking not found', 'NOT_FOUND', 404);
-    return;
-  }
+  if (!booking) { errorResponse(res, 'Booking not found', 'NOT_FOUND', 404); return; }
 
   if (booking.customerId.toString() !== auth(req).user._id.toString()) {
-    errorResponse(
-      res,
-      'Only the customer can assign a technician',
-      'FORBIDDEN',
-      403,
-    );
+    errorResponse(res, 'Only the customer can assign a technician', 'FORBIDDEN', 403);
     return;
   }
 
@@ -268,7 +227,7 @@ export const assignTechnician = async (
       res,
       `Cannot assign technician — booking is ${booking.status}`,
       'INVALID_TRANSITION',
-      400,
+      400
     );
     return;
   }
@@ -298,7 +257,7 @@ export const assignTechnician = async (
   socketService.emitBookingStatus(
     booking.customerId.toString(),
     technicianId,
-    booking,
+    booking
   );
 
   // FCM push to the technician.
@@ -310,13 +269,77 @@ export const assignTechnician = async (
     new Types.ObjectId(technicianId),
     booking._id,
     customerName,
-    serviceName,
+    serviceName
   );
 
   // Schedule the 2-minute auto-reject timer.
   assignmentTimeout.schedule(booking._id.toString());
 
   successResponse(res, booking, 'Technician requested');
+};
+
+/**
+ * Customer backs out of the current technician request without
+ * cancelling the whole booking. Transitions
+ * TechnicianRequested → PendingTechnician so they can pick someone
+ * else immediately.
+ */
+export const cancelAssignment = async (req: Request, res: Response): Promise<void> => {
+  const booking = await Booking.findById(req.params.id);
+  if (!booking) { errorResponse(res, 'Booking not found', 'NOT_FOUND', 404); return; }
+
+  if (booking.customerId.toString() !== auth(req).user._id.toString()) {
+    errorResponse(res, 'Only the customer can cancel the assignment', 'FORBIDDEN', 403);
+    return;
+  }
+
+  if (booking.status !== BookingStatus.TechnicianRequested) {
+    errorResponse(
+      res,
+      `Cannot cancel assignment — booking is ${booking.status}`,
+      'INVALID_TRANSITION',
+      400
+    );
+    return;
+  }
+
+  const previousTechnicianId = booking.technicianId?.toString();
+  booking.status = BookingStatus.PendingTechnician;
+  booking.technicianId = null;
+  booking.assignedAt = null;
+  await booking.save();
+
+  // Cancel the pending 2-min timer.
+  assignmentTimeout.cancel(booking._id.toString());
+
+  // Tell the previous technician their request was withdrawn.
+  if (previousTechnicianId) {
+    socketService.emitBookingStatus(
+      booking.customerId.toString(),
+      previousTechnicianId,
+      booking
+    );
+  }
+
+  successResponse(res, booking, 'Assignment cancelled — pick another technician');
+};
+
+/**
+ * Returns the customer's currently active booking, if any. Used by
+ * the Android home screen to show a "you have a pending request"
+ * banner that resumes the flow.
+ */
+export const getActiveBooking = async (req: Request, res: Response): Promise<void> => {
+  const customerId = auth(req).user._id;
+  const booking = await Booking.findOne({
+    customerId,
+    status: { $in: ACTIVE_STATUSES },
+  })
+    .sort({ createdAt: -1 })
+    .populate('serviceId', 'name price durationMinutes')
+    .populate('customerId', 'name avatarUrl')
+    .populate('technicianId', 'name avatarUrl phone');
+  successResponse(res, booking);
 };
 
 /**
@@ -442,13 +465,14 @@ export const getBookingById = async (
     return;
   }
 
+  // technicianId is null for bookings in pending_technician status (no
+  // technician picked yet). Only the customer can read the booking in
+  // that case. Once a technician is assigned, either party can read.
   const uid = auth(req).user._id.toString();
-  const custId = (
-    booking.customerId as unknown as { _id: Types.ObjectId }
-  )._id.toString();
-  const techId = (
-    booking.technicianId as unknown as { _id: Types.ObjectId }
-  )._id.toString();
+  const custId = (booking.customerId as unknown as { _id: Types.ObjectId })._id.toString();
+  const techId = booking.technicianId
+    ? (booking.technicianId as unknown as { _id: Types.ObjectId })._id.toString()
+    : null;
   if (uid !== custId && uid !== techId) {
     errorResponse(res, 'Access denied', 'FORBIDDEN', 403);
     return;
@@ -515,7 +539,7 @@ export const rescheduleBooking = async (
   socketService.emitBookingStatus(
     existing.customerId.toString(),
     existing.technicianId?.toString() ?? '',
-    { ...newBooking.toObject(), rescheduled: true },
+    { ...newBooking.toObject(), rescheduled: true }
   );
 
   successResponse(res, newBooking, 'Booking rescheduled');
@@ -550,31 +574,16 @@ export const acceptBooking = async (
  * The legacy hard-reject (status=Rejected, terminal) is preserved
  * only for already-Pending bookings created before the flow change.
  */
-export const rejectBooking = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
+export const rejectBooking = async (req: Request, res: Response): Promise<void> => {
   const booking = await Booking.findById(req.params.id)
-    .populate<{
-      customerId: { _id: Types.ObjectId; name: string };
-    }>('customerId', 'name')
-    .populate<{
-      technicianId: { _id: Types.ObjectId; name: string } | null;
-    }>('technicianId', 'name');
+    .populate<{ customerId: { _id: Types.ObjectId; name: string } }>('customerId', 'name')
+    .populate<{ technicianId: { _id: Types.ObjectId; name: string } | null }>('technicianId', 'name');
 
-  if (!booking) {
-    errorResponse(res, 'Booking not found', 'NOT_FOUND', 404);
-    return;
-  }
+  if (!booking) { errorResponse(res, 'Booking not found', 'NOT_FOUND', 404); return; }
 
   const techId = booking.technicianId?._id.toString();
   if (!techId || techId !== auth(req).user._id.toString()) {
-    errorResponse(
-      res,
-      'Only the assigned technician can reject',
-      'FORBIDDEN',
-      403,
-    );
+    errorResponse(res, 'Only the assigned technician can reject', 'FORBIDDEN', 403);
     return;
   }
 
@@ -586,12 +595,12 @@ export const rejectBooking = async (
     socketService.emitBookingStatus(
       booking.customerId._id.toString(),
       techId,
-      booking,
+      booking
     );
     await fcmService.notifyBookingRejected(
       booking.customerId._id,
       booking._id,
-      (req.body as { reason?: string }).reason,
+      (req.body as { reason?: string }).reason
     );
     successResponse(res, booking, 'Booking rejected');
     return;
@@ -603,7 +612,7 @@ export const rejectBooking = async (
       res,
       `Cannot reject — booking is ${booking.status}`,
       'INVALID_TRANSITION',
-      400,
+      400
     );
     return;
   }
@@ -629,14 +638,10 @@ export const rejectBooking = async (
   await fcmService.notifyBookingRejected(
     booking.customerId._id,
     booking._id,
-    reason ?? 'Technician declined — please choose another',
+    reason ?? 'Technician declined — please choose another'
   );
 
-  successResponse(
-    res,
-    booking,
-    'Request declined — customer can pick another technician',
-  );
+  successResponse(res, booking, 'Request declined — customer can pick another technician');
 };
 
 export const startBooking = async (
@@ -690,12 +695,14 @@ export const getInvoice = async (
   }
 
   const uid = auth(req).user._id.toString();
-  const custId = (
-    booking.customerId as unknown as { _id: Types.ObjectId }
-  )._id.toString();
-  const techId = (
-    booking.technicianId as unknown as { _id: Types.ObjectId }
-  )._id.toString();
+  const custId = (booking.customerId as unknown as { _id: Types.ObjectId })._id.toString();
+  // Same null-safety as getBookingById — pending_technician bookings have
+  // no assigned technician yet. (In practice you wouldn't call getInvoice
+  // on a pending_technician booking since the invoice is meaningless then,
+  // but we guard anyway so the endpoint never 500s.)
+  const techId = booking.technicianId
+    ? (booking.technicianId as unknown as { _id: Types.ObjectId })._id.toString()
+    : null;
   if (uid !== custId && uid !== techId) {
     errorResponse(res, 'Access denied', 'FORBIDDEN', 403);
     return;

@@ -117,16 +117,16 @@ export const sendMessage = async (
   await message.populate('senderId', 'name avatarUrl');
   emitNewMessage(bookingId, message);
 
-  const recipientId =
-    booking.customerId.toString() === auth(req).user._id.toString()
-      ? (booking.technicianId as Types.ObjectId)
-      : (booking.customerId as Types.ObjectId);
-
-  await notifyNewMessage(
-    recipientId,
-    booking._id as Types.ObjectId,
-    auth(req).user.name,
-  );
+  // Resolve the recipient. If the booking has no technician yet
+  // (pending_technician), there's nobody on the other side to notify —
+  // skip the FCM call rather than blow up trying to dereference null.
+  const isCustomer = booking.customerId.toString() === auth(req).user._id.toString();
+  const recipientId = isCustomer
+    ? (booking.technicianId as Types.ObjectId | null)
+    : (booking.customerId as Types.ObjectId);
+  if (recipientId) {
+    await notifyNewMessage(recipientId, booking._id as Types.ObjectId, auth(req).user.name);
+  }
   successResponse(res, message, 'Message sent', 201);
 };
 
@@ -163,16 +163,15 @@ export const sendAttachment = async (
   await message.populate('senderId', 'name avatarUrl');
   emitNewMessage(bookingId, message);
 
-  const recipientId =
-    booking.customerId.toString() === auth(req).user._id.toString()
-      ? (booking.technicianId as Types.ObjectId)
-      : (booking.customerId as Types.ObjectId);
-
-  await notifyNewMessage(
-    recipientId,
-    booking._id as Types.ObjectId,
-    auth(req).user.name,
-  );
+  // Same recipient resolution as sendMessage — null-safe for bookings
+  // that haven't been assigned a technician yet.
+  const isCustomer = booking.customerId.toString() === auth(req).user._id.toString();
+  const recipientId = isCustomer
+    ? (booking.technicianId as Types.ObjectId | null)
+    : (booking.customerId as Types.ObjectId);
+  if (recipientId) {
+    await notifyNewMessage(recipientId, booking._id as Types.ObjectId, auth(req).user.name);
+  }
   successResponse(res, message, 'Attachment sent', 201);
 };
 

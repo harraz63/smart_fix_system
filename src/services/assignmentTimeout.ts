@@ -71,21 +71,21 @@ const expire = async (bookingId: string): Promise<void> => {
       socketService.emitBookingStatus(
         booking.customerId.toString(),
         technicianId,
-        booking,
+        booking
       );
     } else {
       // Edge case: emit only to customer.
-      socketService.emitNotification(booking.customerId.toString(), {
-        type: 'booking:status',
-        booking,
-      });
+      socketService.emitNotification(
+        booking.customerId.toString(),
+        { type: 'booking:status', booking }
+      );
     }
 
     // FCM ping to the customer in case the app is backgrounded.
     await fcmService.notifyBookingRejected(
       booking.customerId,
       booking._id,
-      'Technician did not respond — please choose another.',
+      'Technician did not respond — please choose another.'
     );
   } catch (err) {
     console.error('[assignmentTimeout] expire failed', err);
@@ -115,17 +115,14 @@ export const reconcileOnBoot = async (): Promise<void> => {
     if (!booking.assignedAt) continue;
     const elapsed = Date.now() - booking.assignedAt.getTime();
     const remaining = REQUEST_TIMEOUT_MS - elapsed;
-    const handle = setTimeout(
-      () => {
-        void expire(booking._id.toString());
-      },
-      Math.max(0, remaining),
-    );
+    const handle = setTimeout(() => {
+      void expire(booking._id.toString());
+    }, Math.max(0, remaining));
     handles.set(booking._id.toString(), handle);
   }
   if (stale.length || fresh.length) {
     console.log(
-      `[assignmentTimeout] reconciled on boot: expired=${stale.length}, rescheduled=${fresh.length}`,
+      `[assignmentTimeout] reconciled on boot: expired=${stale.length}, rescheduled=${fresh.length}`
     );
   }
 };

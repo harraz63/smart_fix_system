@@ -11,21 +11,9 @@ router.get('/', ctrl.getBookings);
 router.get('/active', requireRole(UserRole.Customer), ctrl.getActiveBooking);
 router.get('/:id', ctrl.getBookingById);
 router.put('/:id/cancel', requireRole(UserRole.Customer), ctrl.cancelBooking);
-router.put(
-  '/:id/reschedule',
-  requireRole(UserRole.Customer),
-  ctrl.rescheduleBooking,
-);
-router.put(
-  '/:id/assign-technician',
-  requireRole(UserRole.Customer),
-  ctrl.assignTechnician,
-);
-router.put(
-  '/:id/cancel-assignment',
-  requireRole(UserRole.Customer),
-  ctrl.cancelAssignment,
-);
+router.put('/:id/reschedule', requireRole(UserRole.Customer), ctrl.rescheduleBooking);
+router.put('/:id/assign-technician', requireRole(UserRole.Customer), ctrl.assignTechnician);
+router.put('/:id/cancel-assignment', requireRole(UserRole.Customer), ctrl.cancelAssignment);
 router.get('/:id/invoice', ctrl.getInvoice);
 router.get('/:id/tracking', ctrl.getTracking);
 router.post('/:id/report', requireRole(UserRole.Customer), ctrl.reportBooking);

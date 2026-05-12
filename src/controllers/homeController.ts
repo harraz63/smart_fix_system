@@ -6,11 +6,7 @@ import User from '../models/User';
 import TechnicianProfile from '../models/TechnicianProfile';
 import Review from '../models/Review';
 import { BookingStatus, TechnicianType } from '../types';
-import {
-  successResponse,
-  errorResponse,
-  paginatedResponse,
-} from '../utils/responseHelper';
+import { successResponse, errorResponse, paginatedResponse } from '../utils/responseHelper';
 import { paginate, buildPagination } from '../utils/pagination';
 
 export const getHome = async (_req: Request, res: Response): Promise<void> => {
@@ -325,6 +321,21 @@ export const getNearbyTechnicians = async (
     errorResponse(res, 'lat and lng required', 'MISSING_PARAMS', 400);
     return;
   }
+
+  // Find technicians who are currently tied up on a non-terminal booking,
+  // so we can filter them out below. A technician is considered "busy"
+  // for a customer's purposes once they've been requested by anyone, all
+  // the way through to "started". After Completed/Cancelled they're free.
+  const busyTechnicianIds = await Booking.distinct('technicianId', {
+    technicianId: { $ne: null },
+    status: {
+      $in: [
+        BookingStatus.TechnicianRequested,
+        BookingStatus.Accepted,
+        BookingStatus.Started,
+      ],
+    },
+  });
 
   // Find technicians who are currently tied up on a non-terminal booking,
   // so we can filter them out below. A technician is considered "busy"
