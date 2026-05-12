@@ -31,11 +31,14 @@ const bookingSchema = new Schema<IBooking>(
     reportedAt: { type: Date, default: null },
     reportReason: { type: String, default: null },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 bookingSchema.index({ customerId: 1, status: 1 });
 bookingSchema.index({ technicianId: 1, status: 1 });
 
-const Booking: Model<IBooking> = mongoose.model<IBooking>('Booking', bookingSchema);
+const Booking: Model<IBooking> = mongoose.model<IBooking>(
+  'Booking',
+  bookingSchema,
+);
 export default Booking;

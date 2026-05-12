@@ -21,6 +21,10 @@ router.post('/:id/report', requireRole(UserRole.Customer), ctrl.reportBooking);
 router.put('/:id/accept', requireRole(UserRole.Technician), ctrl.acceptBooking);
 router.put('/:id/reject', requireRole(UserRole.Technician), ctrl.rejectBooking);
 router.put('/:id/start', requireRole(UserRole.Technician), ctrl.startBooking);
-router.put('/:id/complete', requireRole(UserRole.Technician), ctrl.completeBooking);
+router.put(
+  '/:id/complete',
+  requireRole(UserRole.Technician),
+  ctrl.completeBooking,
+);
 
 export default router;

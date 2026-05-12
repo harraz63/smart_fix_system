@@ -9,11 +9,11 @@ export enum UserRole {
 }
 
 export enum TechnicianType {
-  Painting     = 'painting',
-  Carpentry    = 'carpentry',
+  Painting = 'painting',
+  Carpentry = 'carpentry',
   Conditioning = 'conditioning',
-  Electricity  = 'electricity',
-  Plumbing     = 'plumbing',
+  Electricity = 'electricity',
+  Plumbing = 'plumbing',
 }
 
 export enum BookingStatus {
@@ -42,21 +42,21 @@ export enum BookingStatus {
 }
 
 export enum MessageType {
-  Text  = 'text',
+  Text = 'text',
   Image = 'image',
-  File  = 'file',
+  File = 'file',
 }
 
 export enum PaymentStatus {
   Pending = 'pending',
   Success = 'success',
-  Failed  = 'failed',
+  Failed = 'failed',
 }
 
 export enum DocumentType {
-  Identity      = 'identity',
+  Identity = 'identity',
   Certification = 'certification',
-  Other         = 'other',
+  Other = 'other',
 }
 
 // ─── Sub-document interfaces ──────────────────────────────────────────────────

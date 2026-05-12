@@ -3,7 +3,11 @@ import { Types } from 'mongoose';
 import Message from '../models/Message';
 import Booking from '../models/Booking';
 import { AuthRequest, IBooking, MessageType } from '../types';
-import { successResponse, errorResponse, paginatedResponse } from '../utils/responseHelper';
+import {
+  successResponse,
+  errorResponse,
+  paginatedResponse,
+} from '../utils/responseHelper';
 import { paginate, buildPagination } from '../utils/pagination';
 import { emitNewMessage, emitMessageRead } from '../services/socket';
 import { notifyNewMessage } from '../services/fcm';
@@ -12,7 +16,7 @@ const auth = (req: Request): AuthRequest => req as AuthRequest;
 
 const checkBookingAccess = async (
   bookingId: string,
-  userId: string
+  userId: string,
 ): Promise<IBooking | null | false> => {
   const booking = await Booking.findById(bookingId);
   if (!booking) return null;
@@ -37,21 +41,37 @@ export const getChats = async (req: Request, res: Response): Promise<void> => {
     bookings.map(async (b) => {
       const [lastMessage, unreadCount] = await Promise.all([
         Message.findOne({ bookingId: b._id }).sort({ createdAt: -1 }),
-        Message.countDocuments({ bookingId: b._id, senderId: { $ne: userId }, isRead: false }),
+        Message.countDocuments({
+          bookingId: b._id,
+          senderId: { $ne: userId },
+          isRead: false,
+        }),
       ]);
       return { booking: b, lastMessage, unreadCount };
-    })
+    }),
   );
   successResponse(res, chats);
 };
 
-export const getMessages = async (req: Request, res: Response): Promise<void> => {
+export const getMessages = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   const { bookingId } = req.params;
   const { page, limit, skip } = paginate(req.query);
 
-  const booking = await checkBookingAccess(bookingId, auth(req).user._id.toString());
-  if (booking === null) { errorResponse(res, 'Booking not found', 'NOT_FOUND', 404); return; }
-  if (booking === false) { errorResponse(res, 'Access denied', 'FORBIDDEN', 403); return; }
+  const booking = await checkBookingAccess(
+    bookingId,
+    auth(req).user._id.toString(),
+  );
+  if (booking === null) {
+    errorResponse(res, 'Booking not found', 'NOT_FOUND', 404);
+    return;
+  }
+  if (booking === false) {
+    errorResponse(res, 'Access denied', 'FORBIDDEN', 403);
+    return;
+  }
 
   const [messages, total] = await Promise.all([
     Message.find({ bookingId })
@@ -64,14 +84,29 @@ export const getMessages = async (req: Request, res: Response): Promise<void> =>
   paginatedResponse(res, messages, buildPagination(page, limit, total));
 };
 
-export const sendMessage = async (req: Request, res: Response): Promise<void> => {
+export const sendMessage = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   const { bookingId } = req.params;
   const { content } = req.body as { content?: string };
-  if (!content) { errorResponse(res, 'content required', 'MISSING_FIELD', 400); return; }
+  if (!content) {
+    errorResponse(res, 'content required', 'MISSING_FIELD', 400);
+    return;
+  }
 
-  const booking = await checkBookingAccess(bookingId, auth(req).user._id.toString());
-  if (booking === null) { errorResponse(res, 'Booking not found', 'NOT_FOUND', 404); return; }
-  if (booking === false) { errorResponse(res, 'Access denied', 'FORBIDDEN', 403); return; }
+  const booking = await checkBookingAccess(
+    bookingId,
+    auth(req).user._id.toString(),
+  );
+  if (booking === null) {
+    errorResponse(res, 'Booking not found', 'NOT_FOUND', 404);
+    return;
+  }
+  if (booking === false) {
+    errorResponse(res, 'Access denied', 'FORBIDDEN', 403);
+    return;
+  }
 
   const message = await Message.create({
     bookingId,
@@ -95,13 +130,28 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
   successResponse(res, message, 'Message sent', 201);
 };
 
-export const sendAttachment = async (req: Request, res: Response): Promise<void> => {
+export const sendAttachment = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   const { bookingId } = req.params;
-  if (!req.file) { errorResponse(res, 'No file uploaded', 'NO_FILE', 400); return; }
+  if (!req.file) {
+    errorResponse(res, 'No file uploaded', 'NO_FILE', 400);
+    return;
+  }
 
-  const booking = await checkBookingAccess(bookingId, auth(req).user._id.toString());
-  if (booking === null) { errorResponse(res, 'Booking not found', 'NOT_FOUND', 404); return; }
-  if (booking === false) { errorResponse(res, 'Access denied', 'FORBIDDEN', 403); return; }
+  const booking = await checkBookingAccess(
+    bookingId,
+    auth(req).user._id.toString(),
+  );
+  if (booking === null) {
+    errorResponse(res, 'Booking not found', 'NOT_FOUND', 404);
+    return;
+  }
+  if (booking === false) {
+    errorResponse(res, 'Access denied', 'FORBIDDEN', 403);
+    return;
+  }
 
   const isImage = req.file.mimetype?.startsWith('image/');
   const message = await Message.create({
@@ -125,17 +175,29 @@ export const sendAttachment = async (req: Request, res: Response): Promise<void>
   successResponse(res, message, 'Attachment sent', 201);
 };
 
-export const markMessageRead = async (req: Request, res: Response): Promise<void> => {
+export const markMessageRead = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   const { bookingId, id } = req.params;
-  const booking = await checkBookingAccess(bookingId, auth(req).user._id.toString());
-  if (!booking) { errorResponse(res, 'Access denied', 'FORBIDDEN', 403); return; }
+  const booking = await checkBookingAccess(
+    bookingId,
+    auth(req).user._id.toString(),
+  );
+  if (!booking) {
+    errorResponse(res, 'Access denied', 'FORBIDDEN', 403);
+    return;
+  }
 
   const message = await Message.findOneAndUpdate(
     { _id: id, bookingId },
     { isRead: true },
-    { new: true }
+    { new: true },
   );
-  if (!message) { errorResponse(res, 'Message not found', 'NOT_FOUND', 404); return; }
+  if (!message) {
+    errorResponse(res, 'Message not found', 'NOT_FOUND', 404);
+    return;
+  }
 
   emitMessageRead(bookingId, id, auth(req).user._id.toString());
   successResponse(res, message, 'Message marked as read');
