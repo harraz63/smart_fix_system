@@ -16,9 +16,11 @@ export const errorResponse = (
   res: Response,
   error: string,
   code = 'ERROR',
-  status = 400
+  status = 400,
+  details?: Record<string, unknown>
 ): Response => {
   const body: ApiError = { success: false, error, code };
+  if (details) body.details = details;
   return res.status(status).json(body);
 };
 

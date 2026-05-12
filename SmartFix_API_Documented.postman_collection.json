@@ -1,8 +1,8 @@
 {
   "info": {
-    "_postman_id": "smartfix-ts-v3-documented",
-    "name": "SmartFix API — Full Documented Collection",
-    "description": "# SmartFix Home Maintenance Platform — API Reference\n\nComplete REST API for the SmartFix graduation project. Connects **Customers** with **Technicians** across 5 specializations.\n\n---\n\n## 🚀 Quick Start\n\n1. **Import** this collection into Postman\n2. Set the `baseUrl` variable to `http://localhost:3000`\n3. Run **🔐 Auth → Login (Customer)** — `accessToken` is auto-saved\n4. Run **🔐 Auth → Login (Technician - Plumber)** — `techAccessToken` is auto-saved\n5. All customer requests use `{{accessToken}}` automatically\n6. All technician requests override auth with `{{techAccessToken}}`\n\n---\n\n## 🔑 Authentication\n\nAll protected endpoints require:\n```\nAuthorization: Bearer <accessToken>\n```\nAccess tokens expire in **15 minutes**. Use `/auth/refresh-token` to get a new one.\n\n---\n\n## 👷 Technician Types\n\n| Value | Label | Icon |\n|---|---|---|\n| `plumbing` | Plumbing | 🔧 |\n| `electricity` | Electricity | ⚡ |\n| `painting` | Painting | 🎨 |\n| `carpentry` | Carpentry | 🪚 |\n| `conditioning` | Air Conditioning | ❄️ |\n\n---\n\n## 📦 Response Envelope\n\n**Success:**\n```json\n{ \"success\": true, \"data\": { ... }, \"message\": \"optional\" }\n```\n**Error:**\n```json\n{ \"success\": false, \"error\": \"Human readable\", \"code\": \"MACHINE_CODE\" }\n```\n**Paginated:**\n```json\n{ \"success\": true, \"data\": [...], \"pagination\": { \"page\": 1, \"limit\": 20, \"total\": 85, \"pages\": 5 } }\n```\n\n---\n\n## 🎭 Demo Credentials (after `npm run seed`)\n\n| Role | Email | Password |\n|---|---|---|\n| Customer | customer@demo.com | Demo1234! |\n| Plumber | tech.plumber@demo.com | Demo1234! |\n| Electrician | tech.electric@demo.com | Demo1234! |\n| Painter | tech.painter@demo.com | Demo1234! |\n| Carpenter | tech.carpenter@demo.com | Demo1234! |\n| AC Technician | tech.ac@demo.com | Demo1234! |\n\n---\n\n## 🔁 Booking Lifecycle\n\n```\npending → accepted  (technician)\npending → rejected  (technician)\npending → cancelled (customer)\naccepted → started  (technician)\naccepted → cancelled (customer)\nstarted → completed (technician)\n```\n\n---\n\n## 🌐 WebSocket Events\n\nConnect: `ws://localhost:3000?token=<accessToken>`\n\n| Event | Direction | Description |\n|---|---|---|\n| `message:send` | Client → Server | Send chat message |\n| `message:receive` | Server → Client | New message received |\n| `message:read` | Server → Client | Message marked read |\n| `booking:new-request` | Server → Technician | New booking request |\n| `booking:status` | Server → Both | Booking status changed |\n| `booking:location` | Server → Customer | Technician GPS update |\n| `notification:new` | Server → Client | In-app notification |\n| `technician:online` | Server → All | Technician online/offline |\n| `payment:confirmed` | Server → Both | Payment success/fail |",
+    "_postman_id": "smartfix-ts-v4-bookingflow",
+    "name": "SmartFix API — v4 (decoupled booking flow)",
+    "description": "# SmartFix Home Maintenance Platform — API Reference\n\nComplete REST API for the SmartFix graduation project. Connects **Customers** with **Technicians** across 5 specializations.\n\n---\n\n## 🚀 Quick Start\n\n1. **Import** this collection into Postman\n2. Set the `baseUrl` variable to `http://localhost:3000`\n3. Run **🔐 Auth → Login (Customer)** — `accessToken` is auto-saved\n4. Run **🔐 Auth → Login (Technician - Plumber)** — `techAccessToken` is auto-saved\n5. All customer requests use `{{accessToken}}` automatically\n6. All technician requests override auth with `{{techAccessToken}}`\n\n---\n\n## 🔑 Authentication\n\nAll protected endpoints require:\n```\nAuthorization: Bearer <accessToken>\n```\nAccess tokens expire in **15 minutes**. Use `/auth/refresh-token` to get a new one.\n\n---\n\n## 👷 Technician Types\n\n| Value | Label | Icon |\n|---|---|---|\n| `plumbing` | Plumbing | 🔧 |\n| `electricity` | Electricity | ⚡ |\n| `painting` | Painting | 🎨 |\n| `carpentry` | Carpentry | 🪚 |\n| `conditioning` | Air Conditioning | ❄️ |\n\n---\n\n## 📦 Response Envelope\n\n**Success:**\n```json\n{ \"success\": true, \"data\": { ... }, \"message\": \"optional\" }\n```\n**Error:**\n```json\n{ \"success\": false, \"error\": \"Human readable\", \"code\": \"MACHINE_CODE\" }\n```\n**Paginated:**\n```json\n{ \"success\": true, \"data\": [...], \"pagination\": { \"page\": 1, \"limit\": 20, \"total\": 85, \"pages\": 5 } }\n```\n\n---\n\n## 🎭 Demo Credentials (after `npm run seed`)\n\n| Role | Email | Password |\n|---|---|---|\n| Customer | customer@demo.com | Demo1234! |\n| Plumber | tech.plumber@demo.com | Demo1234! |\n| Electrician | tech.electric@demo.com | Demo1234! |\n| Painter | tech.painter@demo.com | Demo1234! |\n| Carpenter | tech.carpenter@demo.com | Demo1234! |\n| AC Technician | tech.ac@demo.com | Demo1234! |\n\n---\n\n## 🔁 Booking Lifecycle (v4 — decoupled flow)\n\n```\npending_technician   → technician_requested   (customer assigns)\npending_technician   → cancelled              (customer)\ntechnician_requested → accepted               (technician)\ntechnician_requested → pending_technician     (technician rejects OR 2-min server timeout)\ntechnician_requested → cancelled              (customer)\naccepted             → started                (technician)\naccepted             → cancelled              (customer)\nstarted              → completed              (technician)\n```\n\n**The new flow.** Customer submits the request first (`pending_technician`,\nno technician yet), then picks one via `PUT /bookings/:id/assign-technician`.\nIf the picked technician rejects or times out, the booking returns to\n`pending_technician` and the customer picks again on the same booking record.\n\nThe legacy `pending` status is kept in the enum for backward-compatibility\nwith bookings created before the architecture change. New bookings never\nenter `pending`.\n\n**One active booking per customer.** `POST /bookings` returns\n`409 ACTIVE_BOOKING_EXISTS` (with `details.activeBookingId`) if the customer\nhas any non-terminal booking already.\n\n---\n\n## 🌐 WebSocket Events\n\nConnect: `ws://localhost:3000?token=<accessToken>`\n\n| Event | Direction | Description |\n|---|---|---|\n| `message:send` | Client → Server | Send chat message |\n| `message:receive` | Server → Client | New message received |\n| `message:read` | Server → Client | Message marked read |\n| `booking:new-request` | Server → Technician | New booking request |\n| `booking:status` | Server → Both | Booking status changed |\n| `booking:location` | Server → Customer | Technician GPS update |\n| `notification:new` | Server → Client | In-app notification |\n| `technician:online` | Server → All | Technician online/offline |\n| `payment:confirmed` | Server → Both | Payment success/fail |",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -152,15 +152,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/register",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "register"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "register"]
             },
             "description": "## Register a new Customer account\n\nCreates a new user with role `customer`. After registration, an OTP is generated and logged to the server console (in production it would be sent via SMS/email).\n\n**Required fields:**\n- `name` — full name\n- `email` — unique, case-insensitive\n- `password` — min 6 characters\n- `role` — must be `customer` or `technician`\n\n**Optional fields:**\n- `phone` — phone number string\n\n**Response `201`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"userId\": \"<ObjectId>\",\n    \"email\": \"new.customer@demo.com\",\n    \"role\": \"customer\",\n    \"_devOtp\": \"123456\"\n  },\n  \"message\": \"Registration successful. Please verify your OTP.\"\n}\n```\n\n**Errors:**\n- `400 MISSING_FIELDS` — required field missing\n- `400 INVALID_ROLE` — role not customer/technician\n- `409 DUPLICATE_EMAIL` — email already registered"
           }
@@ -205,15 +198,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/register",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "register"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "register"]
             },
             "description": "## Register a new Technician account (Plumber)\n\nSame as customer registration but requires the additional field `technicianType`.\n\n**Extra required field for technicians:**\n- `technicianType` — one of: `plumbing` | `electricity` | `painting` | `carpentry` | `conditioning`\n\nA `TechnicianProfile` document is automatically created and linked to the user.\n\n**Errors:**\n- `400 MISSING_TECHNICIAN_TYPE` — technicianType not provided\n- `400 INVALID_TYPE` — technicianType value not in allowed list"
           }
@@ -242,15 +228,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/register",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "register"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "register"]
             },
             "description": "## Register a new Technician account (Electrician)\n\nRegisters a technician specializing in **electricity**.\n\n- `technicianType`: `\"electricity\"`"
           }
@@ -279,15 +258,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/register",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "register"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "register"]
             },
             "description": "## Register a new Technician account (Painter)\n\nRegisters a technician specializing in **painting**.\n\n- `technicianType`: `\"painting\"`"
           }
@@ -316,15 +288,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/register",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "register"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "register"]
             },
             "description": "## Register a new Technician account (Carpenter)\n\nRegisters a technician specializing in **carpentry**.\n\n- `technicianType`: `\"carpentry\"`"
           }
@@ -353,15 +318,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/register",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "register"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "register"]
             },
             "description": "## Register a new Technician account (AC)\n\nRegisters a technician specializing in **air conditioning**.\n\n- `technicianType`: `\"conditioning\"`"
           }
@@ -407,15 +365,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/verify-otp",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "verify-otp"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "verify-otp"]
             },
             "description": "## Verify OTP after registration\n\nConfirms the user's identity using the 6-digit OTP sent after registration. On success, returns a full JWT token pair.\n\n**Body:**\n- `userId` — returned from `/register`\n- `otp` — 6-digit code (check server console in dev mode)\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"accessToken\": \"eyJ...\",\n    \"refreshToken\": \"eyJ...\",\n    \"user\": { ... }\n  }\n}\n```\n\n**Errors:**\n- `400 INVALID_OTP` — wrong OTP code\n- `400 OTP_EXPIRED` — OTP older than 10 minutes\n- `400 ALREADY_VERIFIED` — user already verified"
           }
@@ -444,15 +395,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/resend-otp",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "resend-otp"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "resend-otp"]
             },
             "description": "## Resend OTP\n\nGenerates a new 6-digit OTP and invalidates the previous one. Useful if the user did not receive the first OTP.\n\n**Body:**\n- `userId` — returned from `/register`\n\n**Errors:**\n- `400 ALREADY_VERIFIED` — user is already verified\n- `404 NOT_FOUND` — userId not found"
           }
@@ -498,15 +442,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "login"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
             },
             "description": "## Login as Customer\n\nAuthenticates an existing user and returns a JWT access token (15min) and refresh token (30 days). The test script automatically saves `accessToken`, `refreshToken`, and `userId` to collection variables.\n\n**Body:**\n- `email` — registered email address\n- `password` — account password\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"accessToken\": \"eyJ...\",\n    \"refreshToken\": \"eyJ...\",\n    \"isVerified\": true,\n    \"user\": {\n      \"_id\": \"...\",\n      \"name\": \"Ahmed Ali\",\n      \"email\": \"customer@demo.com\",\n      \"role\": \"customer\"\n    }\n  }\n}\n```\n\n**Errors:**\n- `400 MISSING_FIELDS` — email or password missing\n- `401 INVALID_CREDENTIALS` — wrong email or password\n- `403 DEACTIVATED` — account has been deactivated"
           }
@@ -552,15 +489,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "login"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
             },
             "description": "## Login as Technician (Plumber)\n\nLogs in the seeded plumber technician. The test script saves `techAccessToken` and `technicianId` to collection variables.\n\nUse `{{techAccessToken}}` as the Bearer token for all **🔧 Technician Dashboard** requests."
           }
@@ -606,15 +536,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "login"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
             },
             "description": "## Login as Technician (Electrician)\n\nLogs in the seeded electrician. Saves `techAccessToken` and `technicianId`."
           }
@@ -643,15 +566,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "login"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
             },
             "description": "## Login as Technician (Painter)\n\nLogs in the seeded painter. Use the returned token for painting-related technician requests."
           }
@@ -680,15 +596,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "login"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
             },
             "description": "## Login as Technician (Carpenter)\n\nLogs in the seeded carpenter."
           }
@@ -717,15 +626,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "login"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
             },
             "description": "## Login as Technician (AC)\n\nLogs in the seeded AC technician."
           }
@@ -736,15 +638,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/me",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "me"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "me"]
             },
             "description": "## Get current authenticated user\n\nReturns the full profile of the currently authenticated user. For technicians, also returns their `TechnicianProfile` document.\n\n**Auth:** `Bearer {{accessToken}}`\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"user\": { \"_id\": \"...\", \"name\": \"...\", \"role\": \"customer\", ... },\n    \"profile\": null\n  }\n}\n```\nFor technicians, `profile` contains their bio, skills, rating, technicianType, etc.\n\n**Errors:**\n- `401 NO_TOKEN` — no Authorization header\n- `401 INVALID_TOKEN` — expired or invalid token"
           }
@@ -789,15 +684,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/refresh-token",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "refresh-token"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "refresh-token"]
             },
             "description": "## Refresh access token\n\nExchanges a valid refresh token (30d) for a new access token (15min) and a new refresh token. The old refresh token is invalidated (token rotation).\n\n**Body:**\n- `refreshToken` — the current refresh token\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"accessToken\": \"eyJ...\",\n    \"refreshToken\": \"eyJ...\"\n  }\n}\n```\n\n**Errors:**\n- `401 INVALID_TOKEN` — token is expired or malformed\n- `401 TOKEN_REVOKED` — token was already used or user logged out"
           }
@@ -826,15 +714,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/forgot-password",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "forgot-password"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "forgot-password"]
             },
             "description": "## Request password reset\n\nGenerates a 6-digit reset code valid for **15 minutes** and sends it (logged to console in dev mode).\n\nAlways returns `200` regardless of whether the email exists — this prevents user enumeration attacks.\n\n**Body:**\n- `email` — registered email address\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": { \"_devResetCode\": \"654321\" },\n  \"message\": \"If this email exists, a reset code was sent\"\n}\n```\n\n**Errors:**\n- `400 MISSING_FIELD` — email not provided"
           }
@@ -863,15 +744,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/reset-password",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "reset-password"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "reset-password"]
             },
             "description": "## Reset password using code\n\nSets a new password using the 6-digit code from `/forgot-password`. All existing sessions are invalidated (refresh token cleared).\n\n**Body:**\n- `email` — account email\n- `code` — 6-digit reset code\n- `newPassword` — new password\n\n**Errors:**\n- `400 MISSING_FIELDS` — any field missing\n- `400 INVALID_CODE` — wrong code\n- `400 CODE_EXPIRED` — code older than 15 minutes"
           }
@@ -897,15 +771,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/verify-password",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "verify-password"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "verify-password"]
             },
             "description": "## Verify current password\n\n🔒 **Protected** — requires `Authorization: Bearer {{accessToken}}`\n\nVerifies the current password before allowing a sensitive change (e.g. showing the change-password form). Used as a pre-check step.\n\n**Body:**\n- `password` — the user's current password\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": { \"verified\": true },\n  \"message\": \"Password verified\"\n}\n```\n\n**Errors:**\n- `401 WRONG_PASSWORD` — password does not match"
           }
@@ -931,15 +798,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/change-password",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "change-password"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "change-password"]
             },
             "description": "## Change password (while logged in)\n\n🔒 **Protected** — requires `Authorization: Bearer {{accessToken}}`\n\nChanges the password for the currently authenticated user. Requires the current password for security.\n\n**Body:**\n- `currentPassword` — existing password\n- `newPassword` — desired new password\n\n**Errors:**\n- `400 MISSING_FIELDS` — either field missing\n- `401 WRONG_PASSWORD` — currentPassword incorrect"
           }
@@ -950,15 +810,8 @@
             "method": "POST",
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/logout",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "logout"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "logout"]
             },
             "description": "## Logout current session\n\n🔒 **Protected** — requires `Authorization: Bearer {{accessToken}}`\n\nRevokes the refresh token and clears the FCM push token, ending the current session. The access token becomes useless after its natural expiry (15min).\n\n**Response `200`:**\n```json\n{ \"success\": true, \"data\": null, \"message\": \"Logged out\" }\n```"
           }
@@ -975,15 +828,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/profile",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "profile"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "profile"]
             },
             "description": "## Get full user profile\n\n🔒 **Protected**\n\nReturns the complete profile of the authenticated user including addresses, settings, and privacy preferences. Sensitive fields (`passwordHash`, `refreshToken`, `otpCode`) are excluded.\n\n**Response `200`:** Full user document."
           }
@@ -1009,15 +855,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/profile",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "profile"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "profile"]
             },
             "description": "## Update user profile\n\n🔒 **Protected**\n\nUpdates editable profile fields. All fields are optional — only provided fields are updated.\n\n**Body (all optional):**\n- `name` — display name\n- `username` — unique username handle\n- `dob` — date of birth (ISO string: `\"1995-06-15\"`)\n- `gender` — `\"male\"` | `\"female\"` | `\"other\"`\n- `phone` — phone number string\n\n**Errors:**\n- `409 DUPLICATE_KEY` — username already taken"
           }
@@ -1039,16 +878,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/profile/avatar",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "profile",
-                "avatar"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "profile", "avatar"]
             },
             "description": "## Upload a profile avatar\n\n🔒 **Protected** | `multipart/form-data`\n\nUploads a new avatar image to **Cloudinary** (`smartfix/avatars` folder). If an existing avatar is present, it is automatically deleted from Cloudinary before uploading the new one.\n\n**Form field:**\n- `avatar` — image file (JPEG, PNG, WebP)\n- Max size: **2 MB**\n- Auto-transformed to **400×400px crop fill**\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": { \"avatarUrl\": \"https://res.cloudinary.com/...\" },\n  \"message\": \"Avatar uploaded\"\n}\n```\n\n**Errors:**\n- `400 NO_FILE` — no file attached\n- `400` — file too large or wrong format"
           }
@@ -1059,16 +890,8 @@
             "method": "DELETE",
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/profile/avatar",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "profile",
-                "avatar"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "profile", "avatar"]
             },
             "description": "## Remove profile avatar\n\n🔒 **Protected**\n\nDeletes the current avatar from Cloudinary using the stored `avatarPublicId`, then sets `avatarUrl` and `avatarPublicId` to `null` in the database."
           }
@@ -1079,16 +902,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/profile/qr-code",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "profile",
-                "qr-code"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "profile", "qr-code"]
             },
             "description": "## Generate profile QR code\n\n🔒 **Protected**\n\nGenerates a QR code that encodes the user's public profile URL. Returns a base64-encoded PNG data URL.\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"qrCode\": \"data:image/png;base64,iVBOR...\",\n    \"profileUrl\": \"http://localhost:3000/profile/<userId>\"\n  }\n}\n```"
           }
@@ -1099,16 +914,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/profile/share-link",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "profile",
-                "share-link"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "profile", "share-link"]
             },
             "description": "## Get shareable profile link\n\n🔒 **Protected**\n\nReturns a shareable URL for the user's profile, including a referral code for tracking.\n\n**Response `200`:**\n```json\n{ \"success\": true, \"data\": { \"shareLink\": \"http://...?ref=<userId>\" } }\n```"
           }
@@ -1119,15 +926,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/invite-link",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "invite-link"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "invite-link"]
             },
             "description": "## Get app invite link\n\n🔒 **Protected**\n\nReturns an invite link to share the app with others, including the user's referral code.\n\n**Response `200`:**\n```json\n{ \"success\": true, \"data\": { \"inviteLink\": \"http://.../invite?ref=<userId>\" } }\n```"
           }
@@ -1138,15 +938,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/addresses",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "addresses"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "addresses"]
             },
             "description": "## Get all saved addresses\n\n🔒 **Protected**\n\nReturns the list of saved addresses embedded on the user document.\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": [\n    { \"_id\": \"...\", \"label\": \"Home\", \"lat\": 30.04, \"lng\": 31.23, \"isDefault\": true },\n    { \"_id\": \"...\", \"label\": \"Work\", \"lat\": 30.05, \"lng\": 31.24, \"isDefault\": false }\n  ]\n}\n```"
           }
@@ -1189,15 +982,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/addresses",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "addresses"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "addresses"]
             },
             "description": "## Add a new saved address\n\n🔒 **Protected**\n\nAdds a new address to the user's address list. If this is the first address, it is automatically set as the default.\n\n**Body:**\n- `label` *(required)* — display name, e.g. `\"Home\"`, `\"Work\"`\n- `lat` *(required)* — latitude (float)\n- `lng` *(required)* — longitude (float)\n\n**Response `201`:** Updated list of all addresses.\n\n**Errors:**\n- `400 MISSING_FIELDS` — label, lat, or lng missing"
           }
@@ -1223,16 +1009,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/addresses/{{addressId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "addresses",
-                "{{addressId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "addresses", "{{addressId}}"]
             },
             "description": "## Update a saved address\n\n🔒 **Protected**\n\nUpdates an existing address by its `_id`. All fields are optional.\n\n**URL Param:** `:id` — the `_id` of the address subdocument\n\n**Body (all optional):**\n- `label`, `lat`, `lng`\n\n**Errors:**\n- `404 NOT_FOUND` — address id not found in user's list"
           }
@@ -1243,9 +1021,7 @@
             "method": "PUT",
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/addresses/{{addressId}}/default",
-              "host": [
-                "{{baseUrl}}"
-              ],
+              "host": ["{{baseUrl}}"],
               "path": [
                 "api",
                 "v1",
@@ -1264,16 +1040,8 @@
             "method": "DELETE",
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/addresses/{{addressId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "addresses",
-                "{{addressId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "addresses", "{{addressId}}"]
             },
             "description": "## Delete a saved address\n\n🔒 **Protected**\n\n**URL Param:** `:id` — address `_id`\n\n**Response `200`:** Updated list of remaining addresses.\n\n**Errors:**\n- `404 NOT_FOUND` — address not found"
           }
@@ -1284,15 +1052,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/settings",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "settings"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "settings"]
             },
             "description": "## Get app settings\n\n🔒 **Protected**\n\nReturns the user's current app settings.\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"language\": \"en\",\n    \"theme\": \"light\",\n    \"notifications\": {\n      \"bookingUpdates\": true,\n      \"chatMessages\": true,\n      \"promotions\": false\n    }\n  }\n}\n```"
           }
@@ -1318,16 +1079,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/settings/language",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "settings",
-                "language"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "settings", "language"]
             },
             "description": "## Update app language\n\n🔒 **Protected**\n\n**Body:**\n- `language` — `\"en\"` or `\"ar\"`\n\n**Errors:**\n- `400 INVALID_VALUE` — language not `en` or `ar`"
           }
@@ -1353,16 +1106,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/settings/theme",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "settings",
-                "theme"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "settings", "theme"]
             },
             "description": "## Update app theme\n\n🔒 **Protected**\n\n**Body:**\n- `theme` — `\"light\"` or `\"dark\"`\n\n**Errors:**\n- `400 INVALID_VALUE` — theme not `light` or `dark`"
           }
@@ -1373,15 +1118,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/privacy-settings",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "privacy-settings"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "privacy-settings"]
             },
             "description": "## Get privacy preferences\n\n🔒 **Protected**\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"showPhone\": true,\n    \"showEmail\": false,\n    \"showOnlineStatus\": true\n  }\n}\n```"
           }
@@ -1407,15 +1145,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/privacy-settings",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "privacy-settings"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "privacy-settings"]
             },
             "description": "## Update privacy preferences\n\n🔒 **Protected**\n\nAll fields are optional booleans.\n\n**Body (all optional):**\n- `showPhone` — whether phone number is visible to technicians\n- `showEmail` — whether email is visible\n- `showOnlineStatus` — whether online status is visible"
           }
@@ -1426,15 +1157,8 @@
             "method": "DELETE",
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/account",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "account"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "account"]
             },
             "description": "## Deactivate account\n\n🔒 **Protected**\n\nSets the user's `isActive` to `false`. The account is not hard-deleted — it is deactivated and will be rejected on future login attempts.\n\n**Response `200`:**\n```json\n{ \"success\": true, \"data\": null, \"message\": \"Account deactivated\" }\n```"
           }
@@ -1454,15 +1178,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/content/privacy-policy",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "content",
-                "privacy-policy"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "content", "privacy-policy"]
             },
             "description": "## Get Privacy Policy\n\n🌐 **Public** — no auth required\n\nReturns the app's privacy policy as a plain text string.\n\n**Response `200`:**\n```json\n{ \"success\": true, \"data\": { \"content\": \"SmartFix Privacy Policy...\" } }\n```"
           }
@@ -1476,15 +1193,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/content/contact-us",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "content",
-                "contact-us"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "content", "contact-us"]
             },
             "description": "## Get Contact Information\n\n🌐 **Public** — no auth required\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"email\": \"support@smartfix.app\",\n    \"phone\": \"+20-100-000-0000\",\n    \"social\": {\n      \"facebook\": \"https://facebook.com/smartfix\",\n      \"instagram\": \"https://instagram.com/smartfix\",\n      \"twitter\": \"https://twitter.com/smartfix\"\n    }\n  }\n}\n```"
           }
@@ -1498,15 +1208,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/content/app-version",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "content",
-                "app-version"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "content", "app-version"]
             },
             "description": "## Get current app version\n\n🌐 **Public** — no auth required\n\nReturns the current API version string from the `APP_VERSION` environment variable.\n\n**Response `200`:**\n```json\n{ \"success\": true, \"data\": { \"version\": \"1.0.0\" } }\n```"
           }
@@ -1523,14 +1226,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/home",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "home"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "home"]
             },
             "description": "## Get home screen data\n\n🔒 **Protected**\n\nReturns all data needed for the home screen in a single request:\n- `banners` — promotional banners with type tags\n- `categories` — up to 8 active categories\n- `featuredServices` — up to 6 active services with category info\n- `topTechnicians` — up to 4 online technicians sorted by rating\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"banners\": [...],\n    \"categories\": [...],\n    \"featuredServices\": [...],\n    \"topTechnicians\": [...]\n  }\n}\n```"
           }
@@ -1541,14 +1238,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/banners",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "banners"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "banners"]
             },
             "description": "## Get promotional banners\n\n🔒 **Protected**\n\nReturns the list of promotional banners for the home carousel. Each banner includes a `type` field linking it to a technician specialization.\n\n**Response `200`:** Array of banner objects with `id`, `title`, `subtitle`, `imageUrl`, `type`."
           }
@@ -1559,14 +1250,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technician-types",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technician-types"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technician-types"]
             },
             "description": "## Get all technician type definitions\n\n🔒 **Protected**\n\nReturns the full list of valid technician types with their labels and icons. Use this to populate type-selector UI components.\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": [\n    { \"type\": \"plumbing\",     \"label\": \"Plumbing\",          \"icon\": \"🔧\" },\n    { \"type\": \"electricity\",  \"label\": \"Electricity\",        \"icon\": \"⚡\" },\n    { \"type\": \"painting\",     \"label\": \"Painting\",           \"icon\": \"🎨\" },\n    { \"type\": \"carpentry\",    \"label\": \"Carpentry\",          \"icon\": \"🪚\" },\n    { \"type\": \"conditioning\", \"label\": \"Conditioning\",       \"icon\": \"❄️\" }\n  ]\n}\n```"
           }
@@ -1594,14 +1279,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/categories",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "categories"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "categories"]
             },
             "description": "## Get all active categories\n\n🔒 **Protected**\n\nReturns all active categories sorted by `technicianType` then `name`.\n\n**Query params (all optional):**\n- `type` — filter by technician type (`plumbing` | `electricity` | `painting` | `carpentry` | `conditioning`)\n\n**Response `200`:** Array of category objects with `_id`, `name`, `technicianType`, `icon`, `description`, `isActive`."
           }
@@ -1612,14 +1291,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/categories?type=plumbing",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "categories"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "categories"],
               "query": [
                 {
                   "key": "type",
@@ -1636,14 +1309,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/categories?type=electricity",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "categories"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "categories"],
               "query": [
                 {
                   "key": "type",
@@ -1660,14 +1327,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/categories?type=painting",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "categories"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "categories"],
               "query": [
                 {
                   "key": "type",
@@ -1684,14 +1345,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/categories?type=carpentry",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "categories"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "categories"],
               "query": [
                 {
                   "key": "type",
@@ -1708,14 +1363,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/categories?type=conditioning",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "categories"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "categories"],
               "query": [
                 {
                   "key": "type",
@@ -1732,15 +1381,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/categories/{{categoryId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "categories",
-                "{{categoryId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "categories", "{{categoryId}}"]
             },
             "description": "## Get a single category\n\n🔒 **Protected**\n\n**URL Param:** `:id` — category `_id`\n\n**Errors:**\n- `404 NOT_FOUND` — category not found"
           }
@@ -1751,16 +1393,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/categories/{{categoryId}}/services?page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "categories",
-                "{{categoryId}}",
-                "services"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "categories", "{{categoryId}}", "services"],
               "query": [
                 {
                   "key": "page",
@@ -1798,14 +1432,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/services?page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "services"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "services"],
               "query": [
                 {
                   "key": "page",
@@ -1826,14 +1454,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/services?type=plumbing&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "services"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "services"],
               "query": [
                 {
                   "key": "type",
@@ -1858,14 +1480,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/services?type=electricity&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "services"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "services"],
               "query": [
                 {
                   "key": "type",
@@ -1890,14 +1506,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/services?type=painting&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "services"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "services"],
               "query": [
                 {
                   "key": "type",
@@ -1922,14 +1532,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/services?type=carpentry&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "services"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "services"],
               "query": [
                 {
                   "key": "type",
@@ -1954,14 +1558,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/services?type=conditioning&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "services"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "services"],
               "query": [
                 {
                   "key": "type",
@@ -1986,14 +1584,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/services?minPrice=20&maxPrice=80&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "services"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "services"],
               "query": [
                 {
                   "key": "minPrice",
@@ -2022,15 +1614,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/services/{{serviceId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "services",
-                "{{serviceId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "services", "{{serviceId}}"]
             },
             "description": "## Get a single service\n\n🔒 **Protected**\n\nReturns full service details including the populated category (with `name`, `icon`, `technicianType`, `description`).\n\n**URL Param:** `:id` — service `_id`\n\n**Errors:**\n- `404 NOT_FOUND` — service not found"
           }
@@ -2041,15 +1626,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/services/search?q=leak&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "services",
-                "search"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "services", "search"],
               "query": [
                 {
                   "key": "q",
@@ -2074,15 +1652,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/services/search?q=install&type=electricity",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "services",
-                "search"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "services", "search"],
               "query": [
                 {
                   "key": "q",
@@ -2121,15 +1692,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/search?page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "search"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "search"],
               "query": [
                 {
                   "key": "page",
@@ -2150,15 +1714,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/search?type=plumbing&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "search"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "search"],
               "query": [
                 {
                   "key": "type",
@@ -2183,15 +1740,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/search?type=electricity&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "search"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "search"],
               "query": [
                 {
                   "key": "type",
@@ -2216,15 +1766,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/search?type=painting&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "search"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "search"],
               "query": [
                 {
                   "key": "type",
@@ -2249,15 +1792,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/search?type=carpentry&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "search"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "search"],
               "query": [
                 {
                   "key": "type",
@@ -2282,15 +1818,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/search?type=conditioning&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "search"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "search"],
               "query": [
                 {
                   "key": "type",
@@ -2315,15 +1844,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/search?rating=4&isOnline=true&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "search"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "search"],
               "query": [
                 {
                   "key": "rating",
@@ -2352,15 +1874,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/nearby?lat=30.0444&lng=31.2357&radius=10000",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "nearby"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "nearby"],
               "query": [
                 {
                   "key": "lat",
@@ -2385,15 +1900,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/nearby?lat=30.0444&lng=31.2357&radius=10000&type=plumbing",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "nearby"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "nearby"],
               "query": [
                 {
                   "key": "lat",
@@ -2422,15 +1930,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/nearby?lat=30.0444&lng=31.2357&radius=10000&type=electricity",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "nearby"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "nearby"],
               "query": [
                 {
                   "key": "lat",
@@ -2459,15 +1960,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/nearby?lat=30.0444&lng=31.2357&radius=10000&type=painting",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "nearby"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "nearby"],
               "query": [
                 {
                   "key": "lat",
@@ -2496,15 +1990,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/nearby?lat=30.0444&lng=31.2357&radius=10000&type=carpentry",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "nearby"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "nearby"],
               "query": [
                 {
                   "key": "lat",
@@ -2533,15 +2020,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/nearby?lat=30.0444&lng=31.2357&radius=10000&type=conditioning",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "nearby"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "nearby"],
               "query": [
                 {
                   "key": "lat",
@@ -2570,15 +2050,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/{{technicianId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "{{technicianId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "{{technicianId}}"]
             },
             "description": "## Get technician public profile\n\n🔒 **Protected**\n\nReturns the technician's user info, their full `TechnicianProfile`, and the 5 most recent reviews.\n\n**URL Param:** `:id` — technician's **user** `_id`\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"user\": { \"_id\": \"...\", \"name\": \"...\", \"avatarUrl\": \"...\", \"role\": \"technician\" },\n    \"profile\": {\n      \"technicianType\": \"plumbing\",\n      \"bio\": \"...\",\n      \"skills\": [...],\n      \"experienceYears\": 8,\n      \"rating\": 4.8,\n      \"totalReviews\": 12,\n      \"isOnline\": true\n    },\n    \"recentReviews\": [...]\n  }\n}\n```\n\n**Errors:**\n- `404 NOT_FOUND` — user not found or not a technician"
           }
@@ -2589,9 +2062,7 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/{{technicianId}}/availability",
-              "host": [
-                "{{baseUrl}}"
-              ],
+              "host": ["{{baseUrl}}"],
               "path": [
                 "api",
                 "v1",
@@ -2619,7 +2090,16 @@
                 "exec": [
                   "if (pm.response.code === 201) {",
                   "  pm.collectionVariables.set('bookingId', pm.response.json().data._id);",
-                  "  console.log('✅ bookingId saved:', pm.response.json().data._id);",
+                  "  console.log('\\u2705 bookingId saved:', pm.response.json().data._id);",
+                  "}",
+                  "// If you already have an active booking, the server returns 409 with",
+                  "// details.activeBookingId — capture it so subsequent requests work.",
+                  "if (pm.response.code === 409) {",
+                  "  const activeId = pm.response.json()?.details?.activeBookingId;",
+                  "  if (activeId) {",
+                  "    pm.collectionVariables.set('bookingId', activeId);",
+                  "    console.log('\\u2139\\ufe0f resumed existing bookingId:', activeId);",
+                  "  }",
                   "}"
                 ]
               }
@@ -2635,7 +2115,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"serviceId\": \"{{serviceId}}\",\n  \"technicianId\": \"{{technicianId}}\",\n  \"scheduledAt\": \"2026-08-15T10:00:00.000Z\",\n  \"notes\": \"Please bring all necessary tools\"\n}",
+              "raw": "{\n  \"serviceId\": \"{{serviceId}}\",\n  \"scheduledAt\": \"2026-08-15T10:00:00.000Z\",\n  \"addressId\": \"{{addressId}}\",\n  \"notes\": \"Please bring all necessary tools\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2644,16 +2124,91 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/bookings",
-              "host": [
-                "{{baseUrl}}"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings"]
+            },
+            "description": "## Create a new booking (v4 — no technician yet)\n\n🔒 **Protected** | Role: `customer`\n\nCreates a booking with `status: pending_technician` and `technicianId: null`. The customer assigns a technician in a separate step via **Assign Technician**.\n\n**No socket or FCM is fired here** — those happen on Assign Technician.\n\n### Body\n- `serviceId` *(required)* — `_id` of the service\n- `scheduledAt` *(required)* — ISO date for the appointment\n- `addressId` *(optional)* — `_id` of a saved address; if provided, snapshot stored\n- `notes` *(optional)* — additional instructions\n\n**Removed in v4:** `technicianId` is no longer accepted here.\n\n### Response `201`\nFull booking document with `status: pending_technician` and `technicianId: null`. Auto-saves `bookingId` to the collection.\n\n### Errors\n- `400 MISSING_FIELDS` — `serviceId` or `scheduledAt` missing\n- `404 NOT_FOUND` — service not found\n- `403 FORBIDDEN` — only customers can create bookings\n- `409 ACTIVE_BOOKING_EXISTS` — customer already has a non-terminal booking. The error envelope includes `details.activeBookingId` so the client can deep-link the user back to it. The test script auto-captures it."
+          }
+        },
+        {
+          "name": "Get Active Booking (resume banner)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 && pm.response.json().data) {",
+                  "  pm.collectionVariables.set('bookingId', pm.response.json().data._id);",
+                  "  console.log('\\u2705 active bookingId:', pm.response.json().data._id);",
+                  "} else {",
+                  "  console.log('\\u2139\\ufe0f no active booking');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "active"]
+            },
+            "description": "## Get the customer's currently active booking\n\n🔒 **Protected** | Role: `customer`\n\nReturns the customer's currently active booking — any booking in a non-terminal status (`pending_technician`, `technician_requested`, `accepted`, `started`, or legacy `pending`). Returns `null` in `data` if there isn't one.\n\nUsed by the Android home-screen \"resume banner\" — when a customer reopens the app with a booking still in progress, the banner takes them back to the right step.\n\n### Response `200`\n```json\n{ \"success\": true, \"data\": <booking-or-null> }\n```"
+          }
+        },
+        {
+          "name": "Assign Technician (Order Now)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"technicianId\": \"{{technicianId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/assign-technician",
+              "host": ["{{baseUrl}}"],
               "path": [
                 "api",
                 "v1",
-                "bookings"
+                "bookings",
+                "{{bookingId}}",
+                "assign-technician"
               ]
             },
-            "description": "## Create a new booking\n\n🔒 **Protected** | Role: `customer`\n\nCreates a new booking with status `pending`. After creation:\n- A **WebSocket** event `booking:new-request` is emitted to the technician's room\n- A **FCM push notification** is sent to the technician\n\n**Body:**\n- `serviceId` *(required)* — `_id` of the service\n- `technicianId` *(required)* — `_id` of the technician **user**\n- `scheduledAt` *(required)* — ISO date string for the appointment\n- `addressId` *(optional)* — `_id` of a saved address; if provided, snapshot is stored\n- `notes` *(optional)* — additional instructions for the technician\n\n**Response `201`:** Full booking document with populated `serviceId` and `customerId`.\n\n**Errors:**\n- `400 MISSING_FIELDS` — required field missing\n- `404 NOT_FOUND` — serviceId or technicianId not found\n- `403 FORBIDDEN` — only customers can create bookings"
+            "description": "## Customer picks a technician (\"Order Now\")\n\n🔒 **Protected** | Role: `customer`\n\nTransitions: `pending_technician` → `technician_requested`.\n\nSets `technicianId` and `assignedAt` on the booking, then:\n- Emits `booking:new-request` socket event to the chosen technician\n- Sends FCM push notification to that technician\n- Schedules a **2-minute auto-reject timer** server-side. If the technician doesn't respond in time, the booking is reverted to `pending_technician` and both parties get a `booking:status` socket event.\n\n### Body\n- `technicianId` *(required)* — the user `_id` of the technician to assign\n\n### Errors\n- `400 MISSING_FIELD` — technicianId missing\n- `400 INVALID_TRANSITION` — booking is not in `pending_technician`\n- `403 FORBIDDEN` — caller is not the booking's customer\n- `404 NOT_FOUND` — booking or technician not found"
+          }
+        },
+        {
+          "name": "Cancel Assignment (back to picker)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/cancel-assignment",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{bookingId}}",
+                "cancel-assignment"
+              ]
+            },
+            "description": "## Customer backs out of a technician request\n\n🔒 **Protected** | Role: `customer`\n\nUsed when the customer wants to cancel the request they sent to a technician (during the 2-minute wait) **without killing the whole booking**. The booking record stays alive and the customer can pick another technician on the same booking.\n\nTransitions: `technician_requested` → `pending_technician`.\n\nServer-side actions:\n- Clears `technicianId` and `assignedAt` on the booking\n- Cancels the in-flight 2-minute auto-reject timer\n- Emits `booking:status` socket event to the previous technician so their incoming-requests UI clears\n\nIf you instead want to kill the whole booking, use **Cancel Booking** (transitions to `cancelled`).\n\n### Errors\n- `400 INVALID_TRANSITION` — booking is not in `technician_requested`\n- `403 FORBIDDEN` — caller is not the booking's customer\n- `404 NOT_FOUND` — booking not found"
           }
         },
         {
@@ -2662,14 +2217,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/bookings?page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "bookings"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings"],
               "query": [
                 {
                   "key": "page",
@@ -2685,23 +2234,17 @@
           }
         },
         {
-          "name": "Get Bookings — pending",
+          "name": "Get Bookings — pending_technician",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/v1/bookings?status=pending&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "bookings"
-              ],
+              "raw": "{{baseUrl}}/api/v1/bookings?status=pending_technician&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings"],
               "query": [
                 {
                   "key": "status",
-                  "value": "pending"
+                  "value": "pending_technician"
                 },
                 {
                   "key": "page",
@@ -2713,7 +2256,7 @@
                 }
               ]
             },
-            "description": "## Get pending bookings\n\n🔒 **Protected** | Paginated\n\nReturns only bookings with `status: \"pending\"` — awaiting technician response."
+            "description": "## List the customer's bookings, filtered by status\n\nSame as **Get My Bookings** but with `?status=pending_technician`.\n\nUse any of the new statuses: `pending_technician`, `technician_requested`, `accepted`, `started`, `completed`, `cancelled`, `rejected`. Legacy `pending` is also accepted but new bookings never produce it."
           }
         },
         {
@@ -2722,14 +2265,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/bookings?status=completed&page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "bookings"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings"],
               "query": [
                 {
                   "key": "status",
@@ -2754,15 +2291,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "bookings",
-                "{{bookingId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId}}"]
             },
             "description": "## Get a single booking\n\n🔒 **Protected**\n\nReturns full booking details. Only accessible by the **customer** or **technician** of that specific booking.\n\n**URL Param:** `:id` — booking `_id`\n\n**Errors:**\n- `404 NOT_FOUND` — booking not found\n- `403 FORBIDDEN` — current user is not a participant"
           }
@@ -2773,16 +2303,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/invoice",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "bookings",
-                "{{bookingId}}",
-                "invoice"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId}}", "invoice"]
             },
             "description": "## Get booking invoice\n\n🔒 **Protected** | Accessible to both customer and technician\n\nReturns the invoice for a booking including service breakdown and payment status.\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"booking\": { \"id\": \"...\", \"service\": {...}, \"scheduledAt\": \"...\", \"status\": \"completed\" },\n    \"invoice\": {\n      \"amount\": 30,\n      \"breakdown\": [{ \"label\": \"Fix Leak\", \"amount\": 30 }]\n    },\n    \"payment\": { \"status\": \"success\", \"method\": \"card\", \"gatewayRef\": \"...\" }\n  }\n}\n```"
           }
@@ -2793,16 +2315,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/tracking",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "bookings",
-                "{{bookingId}}",
-                "tracking"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId}}", "tracking"]
             },
             "description": "## Get live technician location\n\n🔒 **Protected**\n\nReturns the technician's current GPS location. **Only available when booking status is `started`.**\n\nFor real-time updates during an active job, listen to the WebSocket event `booking:location` in the booking room.\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"bookingId\": \"...\",\n    \"location\": { \"lat\": 30.05, \"lng\": 31.24 },\n    \"technicianLocation\": { \"lat\": 30.04, \"lng\": 31.23 }\n  }\n}\n```\n\n**Errors:**\n- `400 NOT_ACTIVE` — booking is not in `started` status\n- `404 NOT_FOUND` — booking not found"
           }
@@ -2828,16 +2342,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/reschedule",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "bookings",
-                "{{bookingId}}",
-                "reschedule"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId}}", "reschedule"]
             },
             "description": "## Reschedule a booking\n\n🔒 **Protected** | Role: `customer`\n\nOnly `pending` bookings can be rescheduled. The original booking is **cancelled** and a **new booking** is created with the new date. Both parties are notified via WebSocket.\n\n**Body:**\n- `scheduledAt` *(required)* — new ISO date string\n\n**Response `200`:** New booking document.\n\n**Errors:**\n- `400 MISSING_FIELD` — scheduledAt not provided\n- `400 INVALID_TRANSITION` — booking is not in `pending` status\n- `403 FORBIDDEN` — only the customer of this booking can reschedule"
           }
@@ -2848,16 +2354,8 @@
             "method": "PUT",
             "url": {
               "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/cancel",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "bookings",
-                "{{bookingId}}",
-                "cancel"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId}}", "cancel"]
             },
             "description": "## Cancel a booking\n\n🔒 **Protected** | Role: `customer`\n\nCancels a `pending` or `accepted` booking. Cannot cancel a `started`, `completed`, or `rejected` booking.\n\nBoth parties receive a **WebSocket** `booking:status` event.\n\n**Errors:**\n- `400 INVALID_TRANSITION` — booking status does not allow cancellation\n- `403 FORBIDDEN` — only the customer can cancel"
           }
@@ -2883,16 +2381,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/report",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "bookings",
-                "{{bookingId}}",
-                "report"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId}}", "report"]
             },
             "description": "## Report a booking issue/dispute\n\n🔒 **Protected** | Role: `customer`\n\nFlags a booking with a dispute reason. Sets `reportedAt` and `reportReason` on the booking document.\n\n**Body:**\n- `reason` *(required)* — description of the issue\n\n**Errors:**\n- `400 MISSING_FIELD` — reason not provided\n- `403 FORBIDDEN` — only the customer of this booking can report"
           }
@@ -2919,15 +2409,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technician/dashboard",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technician",
-                "dashboard"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technician", "dashboard"]
             },
             "description": "## Technician dashboard summary\n\n🔒 **Protected** | Role: `technician`\n\nReturns aggregated stats for the technician's home screen.\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"pendingRequests\": 2,\n    \"activeJobs\": 1,\n    \"completedJobs\": 15,\n    \"totalEarnings\": 450.00\n  }\n}\n```"
           }
@@ -2948,15 +2431,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technician/requests?page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technician",
-                "requests"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technician", "requests"],
               "query": [
                 {
                   "key": "page",
@@ -2987,15 +2463,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technician/jobs?page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technician",
-                "jobs"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technician", "jobs"],
               "query": [
                 {
                   "key": "page",
@@ -3026,16 +2495,8 @@
             "method": "PUT",
             "url": {
               "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/accept",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "bookings",
-                "{{bookingId}}",
-                "accept"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId}}", "accept"]
             },
             "description": "## Accept a booking request\n\n🔒 **Protected** | Role: `technician`\n\nTransitions booking from `pending` → `accepted`.\n\nTriggers:\n- **WebSocket** `booking:status` to both customer and technician\n- **FCM push** `booking_accepted` to customer\n\n**Errors:**\n- `400 INVALID_TRANSITION` — booking is not in `pending` status\n- `403 FORBIDDEN` — this booking doesn't belong to the current technician"
           }
@@ -3071,18 +2532,10 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/reject",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "bookings",
-                "{{bookingId}}",
-                "reject"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId}}", "reject"]
             },
-            "description": "## Reject a booking request\n\n🔒 **Protected** | Role: `technician`\n\nTransitions booking from `pending` → `rejected`. The optional `reason` is stored in `rejectionReason`.\n\nTriggers:\n- **WebSocket** `booking:status` to both parties\n- **FCM push** `booking_rejected` to customer\n\n**Body (optional):**\n- `reason` — explanation for the customer"
+            "description": "## Technician declines the request\n\n🔒 **Protected** | Role: `technician`\n\n**Behavior changed in v4.**\n\nFor new-flow bookings (status `technician_requested`):\n- Booking is **NOT** killed. Status returns to `pending_technician`\n- `technicianId` and `assignedAt` are cleared\n- 2-min server-side timer is cancelled\n- Customer's UI gets a `booking:status` socket event and can pick another technician on the same booking\n\nFor legacy bookings (status `pending`): old terminal-reject behavior is preserved — booking transitions to `rejected` permanently.\n\n### Body (optional)\n- `reason` — human-readable explanation, surfaced to the customer\n\n### Errors\n- `400 INVALID_TRANSITION` — booking is not in a rejectable state\n- `403 FORBIDDEN` — caller is not the assigned technician\n- `404 NOT_FOUND` — booking not found"
           }
         },
         {
@@ -3101,16 +2554,8 @@
             "method": "PUT",
             "url": {
               "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/start",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "bookings",
-                "{{bookingId}}",
-                "start"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId}}", "start"]
             },
             "description": "## Mark job as started\n\n🔒 **Protected** | Role: `technician`\n\nTransitions booking from `accepted` → `started`. This enables:\n- Live GPS tracking (customer can call `GET /bookings/:id/tracking`)\n- The technician should start sending location updates via `POST /technician/location`\n\nTriggers:\n- **WebSocket** `booking:status`\n- **FCM push** `booking_started` to customer"
           }
@@ -3131,16 +2576,8 @@
             "method": "PUT",
             "url": {
               "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/complete",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "bookings",
-                "{{bookingId}}",
-                "complete"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId}}", "complete"]
             },
             "description": "## Mark job as completed\n\n🔒 **Protected** | Role: `technician`\n\nTransitions booking from `started` → `completed`. After this:\n- Customer can submit a **review**\n- Customer can **pay** via `/payments/checkout`\n\nTriggers:\n- **WebSocket** `booking:status`\n- **FCM push** `booking_completed` to customer"
           }
@@ -3176,15 +2613,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/technician/status",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technician",
-                "status"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technician", "status"]
             },
             "description": "## Toggle technician online/offline\n\n🔒 **Protected** | Role: `technician`\n\nUpdates `isOnline` on the technician's profile. Only online technicians appear in:\n- `GET /technicians/nearby`\n- The default technician search\n\nEmits **WebSocket** `technician:online` broadcast to all connected clients.\n\n**Body:**\n- `isOnline` *(required)* — `true` or `false`"
           }
@@ -3220,15 +2650,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/technician/location",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technician",
-                "location"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technician", "location"]
             },
             "description": "## Send real-time GPS location\n\n🔒 **Protected** | Role: `technician`\n\nUpdates the technician's current coordinates. Should be called periodically while on a job.\n\nIf there is an **active (`started`) booking**, also:\n- Updates `trackingLocation` on the booking document\n- Emits **WebSocket** `booking:location` to the customer\n\n**Body:**\n- `lat` *(required)* — current latitude\n- `lng` *(required)* — current longitude\n\n**Note:** Call this every ~10–30 seconds during an active job for smooth tracking."
           }
@@ -3264,15 +2687,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/profile",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "profile"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "profile"]
             },
             "description": "## Update technician profile\n\n🔒 **Protected** | Role: `technician`\n\nUpdates the `TechnicianProfile` document for the current technician. All fields optional.\n\n**Body (all optional):**\n- `technicianType` — `plumbing` | `electricity` | `painting` | `carpentry` | `conditioning`\n- `bio` — professional bio text\n- `skills` — array of skill strings\n- `experienceYears` — number\n\n**Errors:**\n- `400 INVALID_TYPE` — technicianType not in valid list"
           }
@@ -3310,16 +2726,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/profile/documents",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technicians",
-                "profile",
-                "documents"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technicians", "profile", "documents"]
             },
             "description": "## Upload verification document\n\n🔒 **Protected** | Role: `technician` | `multipart/form-data`\n\nUploads a document to Cloudinary (`smartfix/documents`) and appends it to the technician's `documents` array.\n\n**Form fields:**\n- `document` *(required)* — PDF or image file (JPEG, PNG). Max **10 MB**.\n- `type` *(optional)* — document type: `\"identity\"` | `\"certification\"` | `\"other\"` (default: `\"other\"`)\n\n**Response `201`:** Updated `documents` array.\n\n**Errors:**\n- `400 NO_FILE` — no file attached"
           }
@@ -3340,15 +2748,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technician/earnings",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technician",
-                "earnings"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technician", "earnings"]
             },
             "description": "## Get earnings summary\n\n🔒 **Protected** | Role: `technician`\n\nReturns aggregated earnings across time periods. Only counts payments with `status: \"success\"` linked to the technician's completed bookings.\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"today\": 30.00,\n    \"thisWeek\": 120.00,\n    \"total\": 450.00\n  }\n}\n```\n\n> Display-only. No actual payout/bank transfer logic."
           }
@@ -3369,16 +2770,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technician/earnings/history?page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "technician",
-                "earnings",
-                "history"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "technician", "earnings", "history"],
               "query": [
                 {
                   "key": "page",
@@ -3405,14 +2798,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/chats",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "chats"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "chats"]
             },
             "description": "## Get all chat conversations\n\n🔒 **Protected**\n\nReturns all chat threads for the current user — one entry per booking. Each entry includes:\n- The booking info (service, customer, technician)\n- The most recent message\n- Unread message count\n\n**Response `200`:** Array of `{ booking, lastMessage, unreadCount }` sorted by booking `updatedAt` descending."
           }
@@ -3423,16 +2810,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/chats/{{bookingId}}/messages?page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "chats",
-                "{{bookingId}}",
-                "messages"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "chats", "{{bookingId}}", "messages"],
               "query": [
                 {
                   "key": "page",
@@ -3482,16 +2861,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/chats/{{bookingId}}/messages",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "chats",
-                "{{bookingId}}",
-                "messages"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "chats", "{{bookingId}}", "messages"]
             },
             "description": "## Send a text message\n\n🔒 **Protected**\n\nSends a text message in the booking chat thread.\n\nAfter saving to DB:\n- Emits **WebSocket** `message:receive` to the booking room\n- Sends **FCM push** `chat_message` to the other party\n\n**Body:**\n- `content` *(required)* — message text\n\n**Response `201`:** Created message with `senderId` populated.\n\n**Errors:**\n- `400 MISSING_FIELD` — content not provided\n- `403 FORBIDDEN` — not a booking participant"
           }
@@ -3513,16 +2884,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/chats/{{bookingId}}/attachments",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "chats",
-                "{{bookingId}}",
-                "attachments"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "chats", "{{bookingId}}", "attachments"]
             },
             "description": "## Send a file or image attachment\n\n🔒 **Protected** | `multipart/form-data`\n\nUploads a file to Cloudinary (`smartfix/chat`) and creates a message with `type: \"image\"` or `type: \"file\"`.\n\n**Form field:**\n- `file` *(required)* — attachment (JPEG, PNG, WebP, PDF). Max **10 MB**.\n\nType is auto-detected based on MIME type:\n- `image/*` → `type: \"image\"`\n- Others → `type: \"file\"`\n\nAlso emits WebSocket `message:receive` and FCM push to the other party.\n\n**Errors:**\n- `400 NO_FILE` — no file attached"
           }
@@ -3533,9 +2896,7 @@
             "method": "PUT",
             "url": {
               "raw": "{{baseUrl}}/api/v1/chats/{{bookingId}}/messages/{{messageId}}/read",
-              "host": [
-                "{{baseUrl}}"
-              ],
+              "host": ["{{baseUrl}}"],
               "path": [
                 "api",
                 "v1",
@@ -3561,14 +2922,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/notifications?page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications"],
               "query": [
                 {
                   "key": "page",
@@ -3589,9 +2944,7 @@
             "method": "PUT",
             "url": {
               "raw": "{{baseUrl}}/api/v1/notifications/{{notificationId}}/read",
-              "host": [
-                "{{baseUrl}}"
-              ],
+              "host": ["{{baseUrl}}"],
               "path": [
                 "api",
                 "v1",
@@ -3609,15 +2962,8 @@
             "method": "PUT",
             "url": {
               "raw": "{{baseUrl}}/api/v1/notifications/read-all",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications",
-                "read-all"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications", "read-all"]
             },
             "description": "## Mark all notifications as read\n\n🔒 **Protected**\n\nSets `isRead: true` on all unread notifications belonging to the current user in a single bulk update."
           }
@@ -3628,15 +2974,8 @@
             "method": "DELETE",
             "url": {
               "raw": "{{baseUrl}}/api/v1/notifications/{{notificationId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications",
-                "{{notificationId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications", "{{notificationId}}"]
             },
             "description": "## Delete a notification\n\n🔒 **Protected**\n\n**URL Param:** `:id` — notification `_id`\n\n**Errors:**\n- `404 NOT_FOUND` — notification not found or belongs to another user"
           }
@@ -3662,16 +3001,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/notifications/push/register",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications",
-                "push",
-                "register"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications", "push", "register"]
             },
             "description": "## Register FCM device token\n\n🔒 **Protected**\n\nSaves the Firebase Cloud Messaging (FCM) device token to the user's profile. This token is used to send push notifications to the user's device.\n\nCall this on app launch after obtaining the token from the Firebase SDK.\n\n**Body:**\n- `token` *(required)* — FCM registration token from the device\n\n**Errors:**\n- `400 MISSING_FIELD` — token not provided"
           }
@@ -3682,16 +3013,8 @@
             "method": "DELETE",
             "url": {
               "raw": "{{baseUrl}}/api/v1/notifications/push/unregister",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications",
-                "push",
-                "unregister"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications", "push", "unregister"]
             },
             "description": "## Remove FCM device token\n\n🔒 **Protected**\n\nClears the FCM token from the user's profile. Call this on logout to stop receiving push notifications on this device."
           }
@@ -3702,15 +3025,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/notifications/settings",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications",
-                "settings"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications", "settings"]
             },
             "description": "## Get notification preferences\n\n🔒 **Protected**\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"bookingUpdates\": true,\n    \"chatMessages\": true,\n    \"promotions\": false\n  }\n}\n```"
           }
@@ -3736,15 +3052,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/notifications/settings",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications",
-                "settings"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications", "settings"]
             },
             "description": "## Update notification preferences\n\n🔒 **Protected**\n\nToggles which notification categories the user receives. All fields are optional booleans.\n\n**Body (all optional):**\n- `bookingUpdates` — booking status change notifications\n- `chatMessages` — new message notifications\n- `promotions` — promotional / marketing notifications"
           }
@@ -3790,14 +3099,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/reviews",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "reviews"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "reviews"]
             },
             "description": "## Submit a review for a completed booking\n\n🔒 **Protected** | Role: `customer`\n\nCreates a review and automatically recalculates the technician's average rating.\n\n**Body:**\n- `bookingId` *(required)* — must be a `completed` booking by this customer\n- `rating` *(required)* — integer `1`–`5`\n- `comment` *(optional)* — text review\n\n**Response `201`:** Created review document.\n\n**Errors:**\n- `400 MISSING_FIELDS` — bookingId or rating not provided\n- `400 INVALID_RATING` — rating outside 1–5\n- `400 INVALID_STATE` — booking not completed\n- `403 FORBIDDEN` — only the customer can review\n- `409 DUPLICATE` — review already submitted for this booking"
           }
@@ -3808,16 +3111,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/reviews/booking/{{bookingId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "reviews",
-                "booking",
-                "{{bookingId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "reviews", "booking", "{{bookingId}}"]
             },
             "description": "## Get review for a specific booking\n\n🔒 **Protected**\n\nReturns the review associated with a booking (one review per booking max). The `customerId` is populated with `name` and `avatarUrl`.\n\n**URL Param:** `:bookingId` — booking `_id`\n\n**Errors:**\n- `404 NOT_FOUND` — no review exists for this booking"
           }
@@ -3843,15 +3138,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/reviews/{{reviewId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "reviews",
-                "{{reviewId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "reviews", "{{reviewId}}"]
             },
             "description": "## Edit a review (within 24h window)\n\n🔒 **Protected** | Role: `customer`\n\nAllows editing the rating and/or comment within **24 hours** of submission. After the edit window closes, the review is permanently locked.\n\n**URL Param:** `:id` — review `_id`\n\n**Body (all optional):**\n- `rating` — new rating (1–5)\n- `comment` — updated text\n\nAfter editing, recalculates the technician's average rating.\n\n**Errors:**\n- `400 EDIT_EXPIRED` — 24-hour edit window has passed\n- `403 FORBIDDEN` — not the author of this review\n- `404 NOT_FOUND` — review not found"
           }
@@ -3862,9 +3150,7 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/technicians/{{technicianId}}/reviews?page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
+              "host": ["{{baseUrl}}"],
               "path": [
                 "api",
                 "v1",
@@ -3898,15 +3184,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/payments/methods",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "payments",
-                "methods"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "methods"]
             },
             "description": "## Get saved payment methods\n\n🔒 **Protected**\n\nReturns the list of saved test payment methods (sandbox only).\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": [\n    { \"id\": \"card_test_1\", \"brand\": \"visa\",       \"last4\": \"4242\", \"expMonth\": 12, \"expYear\": 2025 },\n    { \"id\": \"card_test_2\", \"brand\": \"mastercard\", \"last4\": \"5555\", \"expMonth\": 8,  \"expYear\": 2026 }\n  ]\n}\n```"
           }
@@ -3932,15 +3211,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/payments/methods",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "payments",
-                "methods"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "methods"]
             },
             "description": "## Add a payment method (sandbox)\n\n🔒 **Protected**\n\nAdds a test payment method. In production, this would tokenize a real card via the Stripe SDK.\n\n**Body (all optional — sandbox defaults apply):**\n- `last4` — last 4 digits of test card\n- `expMonth` — expiry month\n- `expYear` — expiry year\n\n**Response `201`:** The new payment method object."
           }
@@ -3951,16 +3223,8 @@
             "method": "DELETE",
             "url": {
               "raw": "{{baseUrl}}/api/v1/payments/methods/card_test_1",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "payments",
-                "methods",
-                "card_test_1"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "methods", "card_test_1"]
             },
             "description": "## Remove a payment method\n\n🔒 **Protected**\n\n**URL Param:** `:id` — payment method id (e.g. `card_test_1`)"
           }
@@ -4000,15 +3264,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/payments/checkout",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "payments",
-                "checkout"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "checkout"]
             },
             "description": "## Pay for a completed booking (sandbox)\n\n🔒 **Protected** | Role: `customer`\n\nInitiates and immediately confirms a sandbox payment for the booking's invoice amount.\n\n**Flow:**\n1. Creates a `PaymentIntent` in Stripe Test Mode (or a demo ref if no Stripe key)\n2. Auto-confirms the payment\n3. Sets payment `status: \"success\"`\n4. Emits **WebSocket** `payment:confirmed` to both customer and technician\n5. Sends **FCM push** `payment_confirmed` to customer\n\n**Body:**\n- `bookingId` *(required)* — must belong to the current customer\n\n**Response `200`:**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"paymentId\": \"...\",\n    \"status\": \"success\",\n    \"amount\": 30\n  },\n  \"message\": \"Payment successful\"\n}\n```\n\n**Errors:**\n- `400 MISSING_FIELD` — bookingId not provided\n- `400 ALREADY_PAID` — booking has already been paid\n- `403 FORBIDDEN` — booking doesn't belong to this customer\n- `404 NOT_FOUND` — booking or service not found"
           }
@@ -4019,15 +3276,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/payments/history?page=1&limit=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "payments",
-                "history"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "history"],
               "query": [
                 {
                   "key": "page",
@@ -4048,15 +3298,8 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "payments",
-                "{{paymentId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "{{paymentId}}"]
             },
             "description": "## Get a specific payment record\n\n🔒 **Protected**\n\nReturns full details of a payment including the booking document.\n\n**URL Param:** `:id` — payment `_id`\n\n**Errors:**\n- `404 NOT_FOUND` — payment not found\n- `403 FORBIDDEN` — payment belongs to another customer"
           }

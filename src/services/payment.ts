@@ -62,7 +62,7 @@ export const confirmPayment = async (paymentId: Types.ObjectId) => {
   if (booking) {
     emitPaymentConfirmed(
       booking.customerId.toString(),
-      booking.technicianId.toString(),
+      booking.technicianId?.toString() ?? '',
       { paymentId, bookingId: booking._id, amount: payment.amount, status: 'success' }
     );
     await notifyPaymentConfirmed(

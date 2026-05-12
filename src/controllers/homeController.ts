@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
+import Booking from '../models/Booking';
 import Category from '../models/Category';
 import Service from '../models/Service';
 import User from '../models/User';
 import TechnicianProfile from '../models/TechnicianProfile';
 import Review from '../models/Review';
-import { TechnicianType } from '../types';
+import { BookingStatus, TechnicianType } from '../types';
 import { successResponse, errorResponse, paginatedResponse } from '../utils/responseHelper';
 import { paginate, buildPagination } from '../utils/pagination';
 
@@ -174,6 +175,21 @@ export const getNearbyTechnicians = async (req: Request, res: Response): Promise
   };
   if (!lat || !lng) { errorResponse(res, 'lat and lng required', 'MISSING_PARAMS', 400); return; }
 
+  // Find technicians who are currently tied up on a non-terminal booking,
+  // so we can filter them out below. A technician is considered "busy"
+  // for a customer's purposes once they've been requested by anyone, all
+  // the way through to "started". After Completed/Cancelled they're free.
+  const busyTechnicianIds = await Booking.distinct('technicianId', {
+    technicianId: { $ne: null },
+    status: {
+      $in: [
+        BookingStatus.TechnicianRequested,
+        BookingStatus.Accepted,
+        BookingStatus.Started,
+      ],
+    },
+  });
+
   const geoFilter: Record<string, unknown> = {
     currentLocation: {
       $near: {
@@ -182,6 +198,10 @@ export const getNearbyTechnicians = async (req: Request, res: Response): Promise
       },
     },
     isOnline: true,
+    // Exclude busy technicians from the pool the customer can pick from.
+    // The customer can still pick someone who has just gone offline if
+    // we drop isOnline, but right now we keep both filters strict.
+    userId: { $nin: busyTechnicianIds },
   };
 
   if (type) {
