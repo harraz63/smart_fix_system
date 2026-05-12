@@ -337,21 +337,6 @@ export const getNearbyTechnicians = async (
     },
   });
 
-  // Find technicians who are currently tied up on a non-terminal booking,
-  // so we can filter them out below. A technician is considered "busy"
-  // for a customer's purposes once they've been requested by anyone, all
-  // the way through to "started". After Completed/Cancelled they're free.
-  const busyTechnicianIds = await Booking.distinct('technicianId', {
-    technicianId: { $ne: null },
-    status: {
-      $in: [
-        BookingStatus.TechnicianRequested,
-        BookingStatus.Accepted,
-        BookingStatus.Started,
-      ],
-    },
-  });
-
   const geoFilter: Record<string, unknown> = {
     currentLocation: {
       $near: {
