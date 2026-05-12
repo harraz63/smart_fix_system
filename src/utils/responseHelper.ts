@@ -5,7 +5,7 @@ export const successResponse = <T>(
   res: Response,
   data: T,
   message?: string,
-  status = 200
+  status = 200,
 ): Response => {
   const body: ApiSuccess<T> = { success: true, data };
   if (message) body.message = message;
@@ -27,7 +27,7 @@ export const errorResponse = (
 export const paginatedResponse = <T>(
   res: Response,
   data: T[],
-  pagination: PaginationMeta
+  pagination: PaginationMeta,
 ): Response => {
   const body: ApiPaginated<T> = { success: true, data, pagination };
   return res.status(200).json(body);
