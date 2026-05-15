@@ -6,11 +6,7 @@ import Service from '../models/Service';
 import TechnicianProfile from '../models/TechnicianProfile';
 import Payment from '../models/Payment';
 import { AuthRequest, BookingStatus, UserRole, TechnicianType } from '../types';
-import {
-  successResponse,
-  errorResponse,
-  paginatedResponse,
-} from '../utils/responseHelper';
+import { successResponse, errorResponse, paginatedResponse } from '../utils/responseHelper';
 import { paginate, buildPagination } from '../utils/pagination';
 import * as socketService from '../services/socket';
 import * as fcmService from '../services/fcm';
@@ -65,7 +61,7 @@ const transitionBooking = async (
   req: Request,
   res: Response,
   targetStatus: BookingStatus,
-  allowedRole: UserRole,
+  allowedRole: UserRole
 ) => {
   const booking = await Booking.findById(req.params.id)
     .populate<{ customerId: { _id: Types.ObjectId; name: string } }>('customerId', 'name')
@@ -74,16 +70,8 @@ const transitionBooking = async (
   if (!booking) { errorResponse(res, 'Booking not found', 'NOT_FOUND', 404); return null; }
 
   const userId = auth(req).user._id.toString();
-  if (
-    allowedRole === UserRole.Customer &&
-    booking.customerId._id.toString() !== userId
-  ) {
-    errorResponse(
-      res,
-      'Only the customer can perform this action',
-      'FORBIDDEN',
-      403,
-    );
+  if (allowedRole === UserRole.Customer && booking.customerId._id.toString() !== userId) {
+    errorResponse(res, 'Only the customer can perform this action', 'FORBIDDEN', 403);
     return null;
   }
   if (allowedRole === UserRole.Technician) {
@@ -100,7 +88,7 @@ const transitionBooking = async (
       res,
       `Cannot transition from ${booking.status} to ${targetStatus}`,
       'INVALID_TRANSITION',
-      400,
+      400
     );
     return null;
   }
@@ -171,8 +159,7 @@ export const createBooking = async (req: Request, res: Response): Promise<void> 
   if (addressId) {
     const customer = await User.findById(customerId);
     const addr = customer?.addresses.id(addressId);
-    if (addr)
-      addressSnapshot = { label: addr.label, lat: addr.lat, lng: addr.lng };
+    if (addr) addressSnapshot = { label: addr.label, lat: addr.lat, lng: addr.lng };
   }
 
   const booking = await Booking.create({
@@ -342,16 +329,12 @@ export const getActiveBooking = async (req: Request, res: Response): Promise<voi
   successResponse(res, booking);
 };
 
-export const getBookings = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
+export const getBookings = async (req: Request, res: Response): Promise<void> => {
   const { status } = req.query as { status?: string };
   const { page, limit, skip } = paginate(req.query);
   const filter: Record<string, unknown> = {};
 
-  if (auth(req).user.role === UserRole.Customer)
-    filter.customerId = auth(req).user._id;
+  if (auth(req).user.role === UserRole.Customer) filter.customerId = auth(req).user._id;
   else filter.technicianId = auth(req).user._id;
 
   if (status) filter.status = status;
@@ -369,19 +352,13 @@ export const getBookings = async (
   paginatedResponse(res, bookings, buildPagination(page, limit, total));
 };
 
-export const getBookingById = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
+export const getBookingById = async (req: Request, res: Response): Promise<void> => {
   const booking = await Booking.findById(req.params.id)
     .populate('serviceId')
     .populate('customerId', 'name avatarUrl phone')
     .populate('technicianId', 'name avatarUrl phone');
 
-  if (!booking) {
-    errorResponse(res, 'Booking not found', 'NOT_FOUND', 404);
-    return;
-  }
+  if (!booking) { errorResponse(res, 'Booking not found', 'NOT_FOUND', 404); return; }
 
   // technicianId is null for bookings in pending_technician status (no
   // technician picked yet). Only the customer can read the booking in
@@ -398,46 +375,24 @@ export const getBookingById = async (
   successResponse(res, booking);
 };
 
-export const cancelBooking = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  const booking = await transitionBooking(
-    req,
-    res,
-    BookingStatus.Cancelled,
-    UserRole.Customer,
-  );
+export const cancelBooking = async (req: Request, res: Response): Promise<void> => {
+  const booking = await transitionBooking(req, res, BookingStatus.Cancelled, UserRole.Customer);
   if (!booking) return;
   successResponse(res, booking, 'Booking cancelled');
 };
 
-export const rescheduleBooking = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
+export const rescheduleBooking = async (req: Request, res: Response): Promise<void> => {
   const { scheduledAt } = req.body as { scheduledAt?: string };
-  if (!scheduledAt) {
-    errorResponse(res, 'scheduledAt required', 'MISSING_FIELD', 400);
-    return;
-  }
+  if (!scheduledAt) { errorResponse(res, 'scheduledAt required', 'MISSING_FIELD', 400); return; }
 
   const existing = await Booking.findById(req.params.id);
-  if (!existing) {
-    errorResponse(res, 'Booking not found', 'NOT_FOUND', 404);
-    return;
-  }
+  if (!existing) { errorResponse(res, 'Booking not found', 'NOT_FOUND', 404); return; }
   if (existing.customerId.toString() !== auth(req).user._id.toString()) {
     errorResponse(res, 'Only the customer can reschedule', 'FORBIDDEN', 403);
     return;
   }
   if (existing.status !== BookingStatus.Pending) {
-    errorResponse(
-      res,
-      'Can only reschedule pending bookings',
-      'INVALID_TRANSITION',
-      400,
-    );
+    errorResponse(res, 'Can only reschedule pending bookings', 'INVALID_TRANSITION', 400);
     return;
   }
 
@@ -463,23 +418,15 @@ export const rescheduleBooking = async (
   successResponse(res, newBooking, 'Booking rescheduled');
 };
 
-export const acceptBooking = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  const booking = await transitionBooking(
-    req,
-    res,
-    BookingStatus.Accepted,
-    UserRole.Technician,
-  );
+export const acceptBooking = async (req: Request, res: Response): Promise<void> => {
+  const booking = await transitionBooking(req, res, BookingStatus.Accepted, UserRole.Technician);
   if (!booking) return;
   // Tech responded in time — clear the 2-min auto-reject timer.
   assignmentTimeout.cancel(booking._id.toString());
   await fcmService.notifyBookingAccepted(
     booking.customerId as unknown as Types.ObjectId,
     booking._id as Types.ObjectId,
-    auth(req).user.name,
+    auth(req).user.name
   );
   successResponse(res, booking, 'Booking accepted');
 };
@@ -562,55 +509,33 @@ export const rejectBooking = async (req: Request, res: Response): Promise<void> 
   successResponse(res, booking, 'Request declined — customer can pick another technician');
 };
 
-export const startBooking = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  const booking = await transitionBooking(
-    req,
-    res,
-    BookingStatus.Started,
-    UserRole.Technician,
-  );
+export const startBooking = async (req: Request, res: Response): Promise<void> => {
+  const booking = await transitionBooking(req, res, BookingStatus.Started, UserRole.Technician);
   if (!booking) return;
   await fcmService.notifyBookingStarted(
     booking.customerId as unknown as Types.ObjectId,
-    booking._id as Types.ObjectId,
+    booking._id as Types.ObjectId
   );
   successResponse(res, booking, 'Job started');
 };
 
-export const completeBooking = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  const booking = await transitionBooking(
-    req,
-    res,
-    BookingStatus.Completed,
-    UserRole.Technician,
-  );
+export const completeBooking = async (req: Request, res: Response): Promise<void> => {
+  const booking = await transitionBooking(req, res, BookingStatus.Completed, UserRole.Technician);
   if (!booking) return;
   await fcmService.notifyBookingCompleted(
     booking.customerId as unknown as Types.ObjectId,
-    booking._id as Types.ObjectId,
+    booking._id as Types.ObjectId
   );
   successResponse(res, booking, 'Job completed');
 };
 
-export const getInvoice = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
+export const getInvoice = async (req: Request, res: Response): Promise<void> => {
   const booking = await Booking.findById(req.params.id)
     .populate('serviceId', 'name price durationMinutes')
     .populate('customerId', 'name email')
     .populate('technicianId', 'name');
 
-  if (!booking) {
-    errorResponse(res, 'Booking not found', 'NOT_FOUND', 404);
-    return;
-  }
+  if (!booking) { errorResponse(res, 'Booking not found', 'NOT_FOUND', 404); return; }
 
   const uid = auth(req).user._id.toString();
   const custId = (booking.customerId as unknown as { _id: Types.ObjectId })._id.toString();
@@ -636,63 +561,34 @@ export const getInvoice = async (
     },
     invoice: booking.invoice,
     payment: payment
-      ? {
-          status: payment.status,
-          method: payment.method,
-          gatewayRef: payment.gatewayRef,
-        }
+      ? { status: payment.status, method: payment.method, gatewayRef: payment.gatewayRef }
       : null,
   });
 };
 
-export const getTracking = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
+export const getTracking = async (req: Request, res: Response): Promise<void> => {
   const booking = await Booking.findById(req.params.id);
-  if (!booking) {
-    errorResponse(res, 'Booking not found', 'NOT_FOUND', 404);
-    return;
-  }
+  if (!booking) { errorResponse(res, 'Booking not found', 'NOT_FOUND', 404); return; }
   if (booking.status !== BookingStatus.Started) {
-    errorResponse(
-      res,
-      'Tracking only available when job is started',
-      'NOT_ACTIVE',
-      400,
-    );
+    errorResponse(res, 'Tracking only available when job is started', 'NOT_ACTIVE', 400);
     return;
   }
-  const profile = await TechnicianProfile.findOne({
-    userId: booking.technicianId,
-  });
+  const profile = await TechnicianProfile.findOne({ userId: booking.technicianId });
   successResponse(res, {
     bookingId: booking._id,
     location: booking.trackingLocation,
     technicianLocation: profile
-      ? {
-          lat: profile.currentLocation.coordinates[1],
-          lng: profile.currentLocation.coordinates[0],
-        }
+      ? { lat: profile.currentLocation.coordinates[1], lng: profile.currentLocation.coordinates[0] }
       : null,
   });
 };
 
-export const reportBooking = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
+export const reportBooking = async (req: Request, res: Response): Promise<void> => {
   const { reason } = req.body as { reason?: string };
-  if (!reason) {
-    errorResponse(res, 'Reason required', 'MISSING_FIELD', 400);
-    return;
-  }
+  if (!reason) { errorResponse(res, 'Reason required', 'MISSING_FIELD', 400); return; }
 
   const booking = await Booking.findById(req.params.id);
-  if (!booking) {
-    errorResponse(res, 'Booking not found', 'NOT_FOUND', 404);
-    return;
-  }
+  if (!booking) { errorResponse(res, 'Booking not found', 'NOT_FOUND', 404); return; }
   if (booking.customerId.toString() !== auth(req).user._id.toString()) {
     errorResponse(res, 'Only customer can report', 'FORBIDDEN', 403);
     return;
@@ -703,34 +599,20 @@ export const reportBooking = async (
   successResponse(res, null, 'Report submitted');
 };
 
-export const getTechnicianDashboard = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
+export const getTechnicianDashboard = async (req: Request, res: Response): Promise<void> => {
   const techId = auth(req).user._id;
   const [pending, active, completed, earnings] = await Promise.all([
+    // v4 pending requests = technician_requested. Legacy pending kept
+    // so the dashboard still reflects the inbox accurately.
     Booking.countDocuments({
       technicianId: techId,
-      status: BookingStatus.Pending,
+      status: { $in: [BookingStatus.TechnicianRequested, BookingStatus.Pending] },
     }),
-    Booking.countDocuments({
-      technicianId: techId,
-      status: { $in: [BookingStatus.Accepted, BookingStatus.Started] },
-    }),
-    Booking.countDocuments({
-      technicianId: techId,
-      status: BookingStatus.Completed,
-    }),
+    Booking.countDocuments({ technicianId: techId, status: { $in: [BookingStatus.Accepted, BookingStatus.Started] } }),
+    Booking.countDocuments({ technicianId: techId, status: BookingStatus.Completed }),
     Payment.aggregate([
       { $match: { status: 'success' } },
-      {
-        $lookup: {
-          from: 'bookings',
-          localField: 'bookingId',
-          foreignField: '_id',
-          as: 'booking',
-        },
-      },
+      { $lookup: { from: 'bookings', localField: 'bookingId', foreignField: '_id', as: 'booking' } },
       { $unwind: '$booking' },
       { $match: { 'booking.technicianId': techId } },
       { $group: { _id: null, total: { $sum: '$amount' } } },
@@ -744,20 +626,18 @@ export const getTechnicianDashboard = async (
   });
 };
 
-export const getTechnicianRequests = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
+export const getTechnicianRequests = async (req: Request, res: Response): Promise<void> => {
   const { page, limit, skip } = paginate(req.query);
+  // v4 incoming requests are in `technician_requested` (customer has
+  // picked this technician and is waiting on a response). Legacy
+  // `pending` is kept for any bookings created before the architecture
+  // change so the tech inbox doesn't silently lose them.
   const filter = {
     technicianId: auth(req).user._id,
-    status: BookingStatus.Pending,
+    status: { $in: [BookingStatus.TechnicianRequested, BookingStatus.Pending] },
   };
   const [bookings, total] = await Promise.all([
-    Booking.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
+    Booking.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
       .populate('serviceId', 'name price')
       .populate('customerId', 'name avatarUrl phone'),
     Booking.countDocuments(filter),
@@ -765,19 +645,13 @@ export const getTechnicianRequests = async (
   paginatedResponse(res, bookings, buildPagination(page, limit, total));
 };
 
-export const getTechnicianJobs = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
+export const getTechnicianJobs = async (req: Request, res: Response): Promise<void> => {
   const { status } = req.query as { status?: string };
   const { page, limit, skip } = paginate(req.query);
   const filter: Record<string, unknown> = { technicianId: auth(req).user._id };
   if (status) filter.status = status;
   const [bookings, total] = await Promise.all([
-    Booking.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
+    Booking.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
       .populate('serviceId', 'name price')
       .populate('customerId', 'name avatarUrl'),
     Booking.countDocuments(filter),
@@ -785,27 +659,18 @@ export const getTechnicianJobs = async (
   paginatedResponse(res, bookings, buildPagination(page, limit, total));
 };
 
-export const toggleTechnicianStatus = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
+export const toggleTechnicianStatus = async (req: Request, res: Response): Promise<void> => {
   const { isOnline } = req.body as { isOnline?: boolean };
   const profile = await TechnicianProfile.findOneAndUpdate(
     { userId: auth(req).user._id },
     { isOnline },
-    { new: true, upsert: true },
+    { new: true, upsert: true }
   );
-  socketService.emitTechnicianPresence(
-    auth(req).user._id.toString(),
-    isOnline ?? false,
-  );
+  socketService.emitTechnicianPresence(auth(req).user._id.toString(), isOnline ?? false);
   successResponse(res, { isOnline: profile?.isOnline }, 'Status updated');
 };
 
-export const updateTechnicianLocation = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
+export const updateTechnicianLocation = async (req: Request, res: Response): Promise<void> => {
   const { lat, lng } = req.body as { lat?: number; lng?: number };
   if (lat === undefined || lng === undefined) {
     errorResponse(res, 'lat and lng required', 'MISSING_FIELDS', 400);
@@ -814,7 +679,7 @@ export const updateTechnicianLocation = async (
   await TechnicianProfile.findOneAndUpdate(
     { userId: auth(req).user._id },
     { currentLocation: { type: 'Point', coordinates: [lng, lat] } },
-    { upsert: true },
+    { upsert: true }
   );
   const activeBooking = await Booking.findOne({
     technicianId: auth(req).user._id,
@@ -826,33 +691,19 @@ export const updateTechnicianLocation = async (
     socketService.emitBookingLocation(
       activeBooking._id.toString(),
       activeBooking.customerId.toString(),
-      { lat, lng },
+      { lat, lng }
     );
   }
   successResponse(res, { lat, lng }, 'Location updated');
 };
 
-export const updateTechnicianProfile = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
+export const updateTechnicianProfile = async (req: Request, res: Response): Promise<void> => {
   const { bio, skills, experienceYears, technicianType } = req.body as {
-    bio?: string;
-    skills?: string[];
-    experienceYears?: number;
-    technicianType?: string;
+    bio?: string; skills?: string[]; experienceYears?: number; technicianType?: string;
   };
 
-  if (
-    technicianType &&
-    !Object.values(TechnicianType).includes(technicianType as TechnicianType)
-  ) {
-    errorResponse(
-      res,
-      `Invalid technicianType. Valid: ${Object.values(TechnicianType).join(', ')}`,
-      'INVALID_TYPE',
-      400,
-    );
+  if (technicianType && !Object.values(TechnicianType).includes(technicianType as TechnicianType)) {
+    errorResponse(res, `Invalid technicianType. Valid: ${Object.values(TechnicianType).join(', ')}`, 'INVALID_TYPE', 400);
     return;
   }
 
@@ -865,19 +716,13 @@ export const updateTechnicianProfile = async (
   const profile = await TechnicianProfile.findOneAndUpdate(
     { userId: auth(req).user._id },
     update,
-    { new: true, upsert: true },
+    { new: true, upsert: true }
   );
   successResponse(res, profile, 'Profile updated');
 };
 
-export const uploadTechnicianDocument = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  if (!req.file) {
-    errorResponse(res, 'No file uploaded', 'NO_FILE', 400);
-    return;
-  }
+export const uploadTechnicianDocument = async (req: Request, res: Response): Promise<void> => {
+  if (!req.file) { errorResponse(res, 'No file uploaded', 'NO_FILE', 400); return; }
   const { type = 'other' } = req.body as { type?: string };
 
   const profile = await TechnicianProfile.findOneAndUpdate(
@@ -887,12 +732,11 @@ export const uploadTechnicianDocument = async (
         documents: {
           type,
           url: (req.file as Express.Multer.File & { path: string }).path,
-          publicId: (req.file as Express.Multer.File & { filename: string })
-            .filename,
+          publicId: (req.file as Express.Multer.File & { filename: string }).filename,
         },
       },
     },
-    { new: true, upsert: true },
+    { new: true, upsert: true }
   );
   successResponse(res, profile?.documents, 'Document uploaded', 201);
 };
